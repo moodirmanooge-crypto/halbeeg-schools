@@ -153,14 +153,20 @@ export default function News() {
             {posts.map((post) => (
               <div className="news-card" key={post.id}>
                 <div className="news-card-header">
-                  {logo ? (
-                    <img src={logo} alt="HALBEEG SCHOOLS" className="news-avatar" />
+                  {post.schoolLogoUrl || logo ? (
+                    <img
+                      src={post.schoolLogoUrl || logo}
+                      alt={post.schoolName || "School"}
+                      className="news-avatar"
+                    />
                   ) : (
                     <span className="news-avatar-fallback">R</span>
                   )}
                   <div className="news-author-block">
                     <div className="news-author-name-row">
-                      <span className="news-author-name">HALBEEG SCHOOLS</span>
+                      <span className="news-author-name">
+                        {post.schoolName || "HALBEEG SCHOOLS"}
+                      </span>
                       <span className="news-verified-badge">✓</span>
                     </div>
                     <span className="news-author-meta">

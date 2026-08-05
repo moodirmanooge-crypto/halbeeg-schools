@@ -1,5 +1,7 @@
 // src/student/StudentIdCard.jsx
-import React from "react";
+import React, { useEffect, useState } from "react";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/firebase";
 import schoolLogo from "../assets/rising-star-logo.png";
 
 const SCHOOL = {
@@ -414,7 +416,7 @@ function BackWaveBottom() {
   );
 }
 
-function CardFront({ student, studentId, issued, expired }) {
+function CardFront({ student, studentId, issued, expired, schoolLogoUrl }) {
   const fullNameText = student?.fullName || "Mohamed Omar Abdulle";
   const gradeText = student?.className
     ? `GRADE ${student.className}`
@@ -424,7 +426,7 @@ function CardFront({ student, studentId, issued, expired }) {
     <div className="idc-card idc-front" id="idc-print-front">
       <div className="idc-front-header">
         <div className="idc-logo-badge">
-          <img src={schoolLogo} alt="HALBEEG SCHOOLS logo" />
+          <img src={schoolLogoUrl || schoolLogo} alt="School logo" />
         </div>
         <div className="idc-school-block">
           <div className="idc-school-name1">{SCHOOL.name1}</div>
@@ -538,6 +540,24 @@ export default function StudentIdCard({ student, studentId }) {
   const issued = formatDate(issuedSource);
   const expired = addOneYear(issued);
 
+  // Logo-da school-ka waxaa laga soo akhriyaa schools/{schoolCode} — kaas oo
+  // ah school-ka ardaygu ka tirsan yahay. Haddii aan la helin, logo-gii
+  // asalka ayaa la isticmaalaa (fallback).
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState("");
+
+  useEffect(() => {
+    const code = student?.schoolCode || "";
+    if (!code) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "schools", code));
+        if (snap.exists()) setSchoolLogoUrl(snap.data().logoUrl || "");
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+  }, [student?.schoolCode]);
+
   const handlePrint = () => {
     const printWindow = window.open("", "_blank", "width=900,height=650");
     if (!printWindow) return;
@@ -578,7 +598,7 @@ export default function StudentIdCard({ student, studentId }) {
       <CardStyles />
 
       <div className="idc-wrap">
-        <CardFront student={student} studentId={studentId} issued={issued} expired={expired} />
+        <CardFront student={student} studentId={studentId} issued={issued} expired={expired} schoolLogoUrl={schoolLogoUrl} />
         <CardBack student={student} studentId={studentId} />
       </div>
 

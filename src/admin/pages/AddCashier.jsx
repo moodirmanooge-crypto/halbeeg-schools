@@ -7,6 +7,7 @@ import {
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import { getSchoolCode, getSchoolName } from "../../utils/schoolContext";
 
 export default function AddCashier() {
   const [fullName, setFullName] = useState("");
@@ -31,6 +32,15 @@ export default function AddCashier() {
     try {
       setLoading(true);
 
+      // Hubi in school la soo galay (schoolCode) — cashier-ku waa inuu school u gaar ahaadaa.
+      const schoolCode = getSchoolCode();
+      const schoolName = getSchoolName();
+      if (!schoolCode) {
+        alert("Fadlan marka hore School Login samee ka hor inta aadan cashier diiwaan gelin.");
+        setLoading(false);
+        return;
+      }
+
       const cashierRef = doc(db, "cashier", username);
 
       const exists = await getDoc(cashierRef);
@@ -42,6 +52,8 @@ export default function AddCashier() {
       }
 
       await setDoc(cashierRef, {
+        schoolCode,
+        schoolName,
         fullName,
         username,
         password,

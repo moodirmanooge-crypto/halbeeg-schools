@@ -163,6 +163,9 @@ export default function ParentDashboard() {
   const [payments, setPayments] = useState([]);
   const [tab, setTab] = useState("overview");
   const [loading, setLoading] = useState(true);
+  // schoolCode-ka ardayga la raacayo — fariimaha guud waxaa lagu shaandheeyaa
+  // si waalidku u arko KALIYA broadcast-yada school-kiisa.
+  const [schoolCode, setSchoolCode] = useState("");
 
   // Regular class timetable + exam timetable (read-only, keyed by day)
   const [timetableByDay, setTimetableByDay] = useState({});
@@ -173,9 +176,31 @@ export default function ParentDashboard() {
 
   useEffect(() => {
     if (!studentId) {
-      navigate("/parent-login");
+      navigate("/login");
       return;
     }
+
+    let unsubMsgsGroup = () => {};
+    let unsubMsgsDirect = () => {};
+    let currentSchoolCode = ""; // la cusbooneysiiyo marka student la soo akhriyo
+    const groupMsgs = new Map();
+    const directMsgs = new Map();
+
+    const publishMessages = () => {
+      // Fariimaha guud: kaliya kuwa school-kan (haddii schoolCode leeyahay).
+      // Fariimaha gaarka (directMsgs) recipientId ayay ku xidhan yihiin,
+      // sidaas school-safe. Fariimaha hore ee aan schoolCode lahayn u soco.
+      const groupFiltered = [...groupMsgs.values()].filter(
+        (m) => !currentSchoolCode || !m.schoolCode || m.schoolCode === currentSchoolCode
+      );
+      const merged = [...groupFiltered, ...directMsgs.values()];
+      merged.sort((a, b) => {
+        const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
+        const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
+        return tb - ta;
+      });
+      setMessages(merged);
+    };
 
     const load = async () => {
       try {
@@ -185,6 +210,9 @@ export default function ParentDashboard() {
           const data = { id: studentSnap.id, ...studentSnap.data() };
           setStudent(data);
           className = data.className;
+          setSchoolCode(data.schoolCode || "");
+          currentSchoolCode = data.schoolCode || "";
+          publishMessages();
         }
 
         try {
@@ -249,21 +277,6 @@ export default function ParentDashboard() {
 
     load();
 
-    let unsubMsgsGroup = () => {};
-    let unsubMsgsDirect = () => {};
-    const groupMsgs = new Map();
-    const directMsgs = new Map();
-
-    const publishMessages = () => {
-      const merged = [...groupMsgs.values(), ...directMsgs.values()];
-      merged.sort((a, b) => {
-        const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt || 0);
-        const tb = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt || 0);
-        return tb - ta;
-      });
-      setMessages(merged);
-    };
-
     try {
       const msgGroupQ = query(
         collection(db, "messages"),
@@ -315,7 +328,7 @@ export default function ParentDashboard() {
   const logout = () => {
     localStorage.removeItem("studentId");
     localStorage.removeItem("parentName");
-    navigate("/parent-login");
+    navigate("/login");
   };
 
   const [markingRead, setMarkingRead] = useState(false);
@@ -384,7 +397,7 @@ export default function ParentDashboard() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={styles.brandMark}>RS</div>
           <div>
-            <div style={{ ...styles.brandTitle, fontSize: 13 }}>Rising School</div>
+            <div style={{ ...styles.brandTitle, fontSize: 13 }}>{student?.schoolName || "HalbeegSchools"}</div>
             <div style={{ ...styles.brandSub, fontSize: 11 }}>Parent Portal</div>
           </div>
         </div>
@@ -399,7 +412,7 @@ export default function ParentDashboard() {
           <div style={styles.brand}>
             <div style={styles.brandMark}>RS</div>
             <div>
-              <div style={styles.brandTitle}>Rising School</div>
+              <div style={styles.brandTitle}>{student?.schoolName || "HalbeegSchools"}</div>
               <div style={styles.brandSub}>Parent Portal</div>
             </div>
           </div>

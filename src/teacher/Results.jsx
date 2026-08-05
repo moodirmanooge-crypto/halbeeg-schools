@@ -66,6 +66,9 @@ export default function Results() {
   const teacherId = localStorage.getItem("teacherId") || "";
   const teacherName = localStorage.getItem("teacherName") || "Teacher";
 
+  // schoolCode-ka macallinka — laga soo akhriyo doc-ka teachers/{teacherId}.
+  const [schoolCode, setSchoolCode] = useState("");
+
   useEffect(() => {
     loadClasses();
     loadTeacherPhoto();
@@ -120,6 +123,7 @@ export default function Results() {
       }
 
       const data = teacherSnap.data();
+      setSchoolCode(data.schoolCode || "");
       const teacherClasses = Array.isArray(data.classes) ? data.classes : [];
 
       const uniqueClassNames = Array.from(
@@ -165,7 +169,11 @@ export default function Results() {
       setLoading(true);
 
       const studentsSnap = await getDocs(
-        query(collection(db, "students"), where("className", "==", className))
+        query(
+          collection(db, "students"),
+          where("schoolCode", "==", schoolCode),
+          where("className", "==", className)
+        )
       );
       const studentList = studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setStudents(studentList);
@@ -323,6 +331,7 @@ export default function Results() {
         // eslint-disable-next-line no-await-in-loop
         await setDoc(doc(db, "results", `${selectedExam}_${student.id}`), {
           examId: selectedExam,
+          schoolCode,
           examName: exam.examName || "",
           examType: examTypeName,
           subject: subjectName,
@@ -366,6 +375,7 @@ export default function Results() {
         senderRole: "Teacher",
         senderId: teacherId,
         senderPhoto: teacherPhoto,
+        schoolCode,
         text: `Macallinka ${teacherName} wuxuu dhammaystiray sax-gareynta exam-ka (${examTypeName || exam.examName}) - Fasalka ${selectedClass} (${subjectName}). Kani waa exam-kii ugu dambeeyay ee la saxay.`,
         type: "results",
         examId: selectedExam,
@@ -391,6 +401,7 @@ export default function Results() {
         {
           className: selectedClass,
           examId: selectedExam,
+          schoolCode,
           examName: exam.examName || "",
           examType: examTypeName,
           subject: subjectName,

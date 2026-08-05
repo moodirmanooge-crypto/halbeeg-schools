@@ -55,11 +55,30 @@ function formatCount(n) {
   return (val % 1 === 0 ? val.toFixed(0) : val.toFixed(1)) + "M";
 }
 
+// Normalizes any gallery doc into a flat array of { url, mediaType }.
+// New posts (created by the multi-upload GalleryManager) carry a
+// `mediaItems` array with everything in that single post. Older posts,
+// created before that change, only have a single `mediaUrl` +
+// `mediaType` at the top level — this wraps that single item into the
+// same array shape so the rest of this file can treat every post
+// (old or new, one photo or many) identically.
+function getItemMedia(item) {
+  if (Array.isArray(item.mediaItems) && item.mediaItems.length > 0) {
+    return item.mediaItems;
+  }
+  if (item.mediaUrl) {
+    return [{ url: item.mediaUrl, mediaType: item.mediaType || "image" }];
+  }
+  return [];
+}
+
 export default function Gallery() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("All");
   const [active, setActive] = useState(null);
+  // Which media item (within the active post) is shown large in the modal.
+  const [activeMediaIndex, setActiveMediaIndex] = useState(0);
   const [commentText, setCommentText] = useState("");
   const [toast, setToast] = useState("");
 
@@ -259,9 +278,14 @@ export default function Gallery() {
     setAccount(null);
   };
 
+  // Filtering now looks across ALL media in a post — a post with even
+  // one video shows up under "Videos", and shows up under "Photos" if
+  // it has at least one image, so multi-media posts don't disappear
+  // from either filter.
   const filtered = items.filter((i) => {
-    if (filter === "Photos") return i.mediaType !== "video";
-    if (filter === "Videos") return i.mediaType === "video";
+    const mediaList = getItemMedia(i);
+    if (filter === "Photos") return mediaList.some((m) => m.mediaType !== "video");
+    if (filter === "Videos") return mediaList.some((m) => m.mediaType === "video");
     return true;
   });
 
@@ -350,9 +374,17 @@ export default function Gallery() {
     }
   };
 
+  function openPost(item, mediaIdx = 0) {
+    setActive(item);
+    setActiveMediaIndex(mediaIdx);
+  }
+
   if (checkingSession) {
     return null;
   }
+
+  const activeMediaList = active ? getItemMedia(active) : [];
+  const activeMedia = activeMediaList[activeMediaIndex] || activeMediaList[0];
 
   return (
     <div className="gal-page">
@@ -490,95 +522,176 @@ export default function Gallery() {
             </div>
           ) : (
             <div className="gal-feed">
-              {filtered.map((item) => (
-                <div className="gal-post" key={item.id}>
-                  <div className="gal-post-header">
-                    {(() => {
-                      const poster = getPostSchool(item);
-                      return (
-                        <>
-                          {poster.logoUrl ? (
-                            <img
-                              src={poster.logoUrl}
-                              alt=""
-                              className="gal-post-avatar"
-                            />
-                          ) : (
-                            <span className="gal-post-avatar gal-post-avatar-fallback">
-                              {poster.name.charAt(0).toUpperCase()}
-                            </span>
-                          )}
-                          <div className="gal-post-author-block">
-                            <div className="gal-post-author-row">
-                              <span className="gal-post-author-name">
-                                {poster.name}
+              {filtered.map((item) => {
+                const mediaList = getItemMedia(item);
+                const extraCount = mediaList.length - 4; // how many beyond the 4 shown in the grid
+
+                return (
+                  <div className="gal-post" key={item.id}>
+                    <div className="gal-post-header">
+                      {(() => {
+                        const poster = getPostSchool(item);
+                        return (
+                          <>
+                            {poster.logoUrl ? (
+                              <img
+                                src={poster.logoUrl}
+                                alt=""
+                                className="gal-post-avatar"
+                              />
+                            ) : (
+                              <span className="gal-post-avatar gal-post-avatar-fallback">
+                                {poster.name.charAt(0).toUpperCase()}
                               </span>
-                              <span className="gal-post-verified">✓</span>
+                            )}
+                            <div className="gal-post-author-block">
+                              <div className="gal-post-author-row">
+                                <span className="gal-post-author-name">
+                                  {poster.name}
+                                </span>
+                                <span className="gal-post-verified">✓</span>
+                              </div>
+                              <span className="gal-post-date">
+                                {formatDate(item.createdAt)}
+                              </span>
                             </div>
-                            <span className="gal-post-date">
-                              {formatDate(item.createdAt)}
-                            </span>
-                          </div>
-                        </>
-                      );
-                    })()}
-                  </div>
+                          </>
+                        );
+                      })()}
+                    </div>
 
-                  {item.caption && (
-                    <div className="gal-caption">{item.caption}</div>
-                  )}
-
-                  <div className="gal-media-wrap" onClick={() => setActive(item)}>
-                    {item.mediaType === "video" ? (
-                      <>
-                        <video src={item.mediaUrl} muted />
-                        <span className="gal-video-badge">▶ Video</span>
-                      </>
-                    ) : (
-                      <img src={item.mediaUrl} alt={item.caption || "Gallery"} />
+                    {item.caption && (
+                      <div className="gal-caption">{item.caption}</div>
                     )}
-                  </div>
 
-                  <div className="gal-post-body">
-                    {(item.likeCount > 0 || (item.comments || []).length > 0) && (
-                      <div className="gal-meta-row">
-                        <span>
-                          {item.likeCount > 0 ? `♥ ${formatCount(item.likeCount)}` : ""}
-                        </span>
-                        <span>
-                          {(item.comments || []).length > 0
-                            ? `${formatCount(item.comments.length)} comments`
-                            : ""}
-                        </span>
+                    {/* Media grid: 1 item = full width, 2+ items = a
+                        Facebook-style grid, with a "+N" overlay on the
+                        last visible tile when there are more than 4. */}
+                    {mediaList.length === 1 ? (
+                      <div
+                        className="gal-media-wrap"
+                        onClick={() => openPost(item, 0)}
+                      >
+                        {mediaList[0].mediaType === "video" ? (
+                          <>
+                            <video src={mediaList[0].url} muted />
+                            <span className="gal-video-badge">▶ Video</span>
+                          </>
+                        ) : (
+                          <img
+                            src={mediaList[0].url}
+                            alt={item.caption || "Gallery"}
+                          />
+                        )}
+                      </div>
+                    ) : (
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr 1fr",
+                          gap: 3,
+                        }}
+                      >
+                        {mediaList.slice(0, 4).map((m, idx) => {
+                          const isLastVisible =
+                            idx === 3 && mediaList.length > 4;
+                          return (
+                            <div
+                              key={idx}
+                              onClick={() => openPost(item, idx)}
+                              style={{
+                                position: "relative",
+                                aspectRatio: "1/1",
+                                overflow: "hidden",
+                                cursor: "pointer",
+                                background: "#000",
+                              }}
+                            >
+                              {m.mediaType === "video" ? (
+                                <video
+                                  src={m.url}
+                                  muted
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                  }}
+                                />
+                              ) : (
+                                <img
+                                  src={m.url}
+                                  alt=""
+                                  style={{
+                                    width: "100%",
+                                    height: "100%",
+                                    objectFit: "cover",
+                                  }}
+                                />
+                              )}
+                              {isLastVisible && (
+                                <div
+                                  style={{
+                                    position: "absolute",
+                                    inset: 0,
+                                    background: "rgba(0,0,0,0.55)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    color: "#fff",
+                                    fontSize: 22,
+                                    fontWeight: 800,
+                                  }}
+                                >
+                                  +{extraCount}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
                       </div>
                     )}
 
-                    <div className="gal-actions-row">
-                      <button
-                        className={
-                          "gal-action-btn" + (hasLiked(item) ? " liked" : "")
-                        }
-                        onClick={() => toggleLike(item)}
-                        disabled={likeBusyId === item.id}
-                      >
-                        {hasLiked(item) ? "♥" : "♡"} Like
-                      </button>
-                      <button
-                        className="gal-action-btn"
-                        onClick={() => setActive(item)}
-                      >
-                        💬 Comment
-                      </button>
-                      <button
-                        className="gal-action-btn"
-                        onClick={() => shareItem(item)}
-                      >
-                        ↗ Share
-                      </button>
+                    <div className="gal-post-body">
+                      {(item.likeCount > 0 || (item.comments || []).length > 0) && (
+                        <div className="gal-meta-row">
+                          <span>
+                            {item.likeCount > 0 ? `♥ ${formatCount(item.likeCount)}` : ""}
+                          </span>
+                          <span>
+                            {(item.comments || []).length > 0
+                              ? `${formatCount(item.comments.length)} comments`
+                              : ""}
+                          </span>
+                        </div>
+                      )}
+
+                      <div className="gal-actions-row">
+                        <button
+                          className={
+                            "gal-action-btn" + (hasLiked(item) ? " liked" : "")
+                          }
+                          onClick={() => toggleLike(item)}
+                          disabled={likeBusyId === item.id}
+                        >
+                          {hasLiked(item) ? "♥" : "♡"} Like
+                        </button>
+                        <button
+                          className="gal-action-btn"
+                          onClick={() => openPost(item, 0)}
+                        >
+                          💬 Comment
+                        </button>
+                        <button
+                          className="gal-action-btn"
+                          onClick={() => shareItem(item)}
+                        >
+                          ↗ Share
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
@@ -587,11 +700,80 @@ export default function Gallery() {
       {active && account && (
         <div className="gal-modal-overlay" onClick={() => setActive(null)}>
           <div className="gal-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="gal-modal-media">
-              {active.mediaType === "video" ? (
-                <video src={active.mediaUrl} controls autoPlay />
+            <div className="gal-modal-media" style={{ position: "relative" }}>
+              {activeMedia?.mediaType === "video" ? (
+                <video src={activeMedia.url} controls autoPlay />
               ) : (
-                <img src={active.mediaUrl} alt={active.caption || "Gallery"} />
+                <img src={activeMedia?.url} alt={active.caption || "Gallery"} />
+              )}
+
+              {/* Prev/next arrows only appear when this post has more
+                  than one photo/video. */}
+              {activeMediaList.length > 1 && (
+                <>
+                  <button
+                    onClick={() =>
+                      setActiveMediaIndex(
+                        (activeMediaIndex - 1 + activeMediaList.length) %
+                          activeMediaList.length
+                      )
+                    }
+                    style={{
+                      position: "absolute",
+                      left: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "rgba(0,0,0,0.5)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: 36,
+                      height: 36,
+                      cursor: "pointer",
+                      fontSize: 18,
+                    }}
+                  >
+                    ‹
+                  </button>
+                  <button
+                    onClick={() =>
+                      setActiveMediaIndex(
+                        (activeMediaIndex + 1) % activeMediaList.length
+                      )
+                    }
+                    style={{
+                      position: "absolute",
+                      right: 10,
+                      top: "50%",
+                      transform: "translateY(-50%)",
+                      background: "rgba(0,0,0,0.5)",
+                      color: "#fff",
+                      border: "none",
+                      borderRadius: "50%",
+                      width: 36,
+                      height: 36,
+                      cursor: "pointer",
+                      fontSize: 18,
+                    }}
+                  >
+                    ›
+                  </button>
+                  <span
+                    style={{
+                      position: "absolute",
+                      bottom: 10,
+                      left: "50%",
+                      transform: "translateX(-50%)",
+                      background: "rgba(0,0,0,0.6)",
+                      color: "#fff",
+                      fontSize: 12,
+                      padding: "3px 10px",
+                      borderRadius: 20,
+                    }}
+                  >
+                    {activeMediaIndex + 1} / {activeMediaList.length}
+                  </span>
+                </>
               )}
             </div>
 

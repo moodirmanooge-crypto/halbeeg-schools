@@ -214,7 +214,7 @@ export default function Profile() {
   const logout = () => {
     localStorage.removeItem("teacherId");
     localStorage.removeItem("teacherName");
-    navigate("/login/teacher");
+    navigate("/login");
   };
 
   const teacherName = localStorage.getItem("teacherName") || "Teacher";

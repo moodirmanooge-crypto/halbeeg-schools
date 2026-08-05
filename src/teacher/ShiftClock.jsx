@@ -15,6 +15,7 @@ import {
   addDoc,
   updateDoc,
   doc,
+  getDoc,
   getDocs,
   query,
   where,
@@ -120,8 +121,22 @@ export default function ShiftClock() {
   const [history, setHistory] = useState([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // schoolCode-ka macallinka — lagu daro shift doc kasta si admin dashboard-ku
+  // u kala saaro school walba. Akhriska wuxuu ku salaysan yahay teacherId
+  // (macallin walba hal school).
+  const [schoolCode, setSchoolCode] = useState("");
+
   useEffect(() => {
     loadActiveShift();
+    (async () => {
+      if (!teacherId) return;
+      try {
+        const tSnap = await getDoc(doc(db, "teachers", teacherId));
+        if (tSnap.exists()) setSchoolCode(tSnap.data().schoolCode || "");
+      } catch (e) {
+        console.log(e);
+      }
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -211,6 +226,7 @@ export default function ShiftClock() {
       const docRef = await addDoc(collection(db, "shifts"), {
         teacherId,
         teacherName,
+        schoolCode,
         clockInAt,
         clockOutAt: null,
         durationMs: null,

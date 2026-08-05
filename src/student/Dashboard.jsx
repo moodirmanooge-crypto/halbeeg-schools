@@ -271,7 +271,7 @@ export default function StudentDashboard() {
 
   useEffect(() => {
     if (!studentId) {
-      navigate("/student-login");
+      navigate("/login");
       return;
     }
 
@@ -279,10 +279,12 @@ export default function StudentDashboard() {
       try {
         const studentSnap = await getDoc(doc(db, "students", studentId));
         let className = null;
+        let studentSchoolCode = "";
         if (studentSnap.exists()) {
           const data = { id: studentSnap.id, ...studentSnap.data() };
           setStudent(data);
           className = data.className;
+          studentSchoolCode = data.schoolCode || "";
         }
 
         try {
@@ -296,10 +298,17 @@ export default function StudentDashboard() {
           setAttendance([]);
         }
 
-        // Load every teacher's name once, so timetable sessions (which only
-        // store teacherId) can be displayed with the teacher's full name.
+        // Load teachers for THIS school only, so timetable sessions (which
+        // store teacherId) show the right teacher name and don't pull in
+        // other schools' teachers.
         try {
-          const teachersSnap = await getDocs(collection(db, "teachers"));
+          const teachersQ = studentSchoolCode
+            ? query(
+                collection(db, "teachers"),
+                where("schoolCode", "==", studentSchoolCode)
+              )
+            : collection(db, "teachers");
+          const teachersSnap = await getDocs(teachersQ);
           const map = {};
           teachersSnap.docs.forEach((d) => {
             const data = d.data();
@@ -457,7 +466,7 @@ export default function StudentDashboard() {
   const logout = () => {
     localStorage.removeItem("studentId");
     localStorage.removeItem("studentName");
-    navigate("/student-login");
+    navigate("/login");
   };
 
   const attendanceStats = attendance.reduce(
@@ -524,7 +533,7 @@ export default function StudentDashboard() {
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <div style={styles.brandMark}>RS</div>
           <div>
-            <div style={{ ...styles.brandTitle, fontSize: 13 }}>Rising School</div>
+            <div style={{ ...styles.brandTitle, fontSize: 13 }}>{student?.schoolName || "HalbeegSchools"}</div>
             <div style={{ ...styles.brandSub, fontSize: 11 }}>Student Portal</div>
           </div>
         </div>
@@ -539,7 +548,7 @@ export default function StudentDashboard() {
           <div style={styles.brand}>
             <div style={styles.brandMark}>RS</div>
             <div>
-              <div style={styles.brandTitle}>Rising School</div>
+              <div style={styles.brandTitle}>{student?.schoolName || "HalbeegSchools"}</div>
               <div style={styles.brandSub}>Student Portal</div>
             </div>
           </div>

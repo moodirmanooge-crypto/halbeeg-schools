@@ -3,15 +3,18 @@ import {
   collection,
   getDocs,
   doc,
+  getDoc,
   setDoc,
   runTransaction,
   serverTimestamp,
+  query,
+  where,
 } from "firebase/firestore";
 
 import { db } from "../firebase/firebase";
 import { theme } from "./theme.js";
 
-const SCHOOL_NAME = "Rising School";
+const DEFAULT_SCHOOL_NAME = "HalbeegSchools";
 
 function todayISO() {
   return new Date().toISOString().slice(0, 10);
@@ -37,6 +40,10 @@ export default function ExamPayments() {
   const [savingId, setSavingId] = useState(null);
   const [lastCard, setLastCard] = useState(null);
 
+  // schoolCode iyo magaca school-ka cashier-ka.
+  const [schoolCode, setSchoolCode] = useState("");
+  const [schoolName, setSchoolName] = useState(DEFAULT_SCHOOL_NAME);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -44,6 +51,24 @@ export default function ExamPayments() {
   async function loadData() {
     try {
       setLoading(true);
+
+      // schoolCode-ka cashier-ka + magaca school-ka.
+      const cashierId = localStorage.getItem("cashierId") || "";
+      let code = "";
+      let name = DEFAULT_SCHOOL_NAME;
+      if (cashierId) {
+        const cSnap = await getDoc(doc(db, "cashier", cashierId));
+        if (cSnap.exists()) {
+          code = cSnap.data().schoolCode || "";
+          if (cSnap.data().schoolName) name = cSnap.data().schoolName;
+        }
+      }
+      if (code) {
+        const sSnap = await getDoc(doc(db, "schools", code));
+        if (sSnap.exists()) name = sSnap.data().schoolName || sSnap.data().name || name;
+      }
+      setSchoolCode(code);
+      setSchoolName(name);
 
       const examWeekSnap = await getDocs(collection(db, "examWeek"));
       const weekMap = {};
@@ -58,7 +83,9 @@ export default function ExamPayments() {
           .map(([cls]) => cls.toUpperCase())
       );
 
-      const studentsSnap = await getDocs(collection(db, "students"));
+      const studentsSnap = await getDocs(
+        query(collection(db, "students"), where("schoolCode", "==", code))
+      );
       const studentData = studentsSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter(
@@ -138,12 +165,13 @@ export default function ExamPayments() {
       const cardDocId = `${student.studentId}_final`;
       const cardRecord = {
         studentId: student.studentId,
+        schoolCode,
         studentName: student.fullName,
         className: student.className || "",
         cardNo,
         examType: "final",
         amountPaid: entered,
-        schoolName: SCHOOL_NAME,
+        schoolName: schoolName,
         createdAt: serverTimestamp(),
       };
       await setDoc(doc(db, "examCards", cardDocId), cardRecord);

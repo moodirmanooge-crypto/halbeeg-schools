@@ -80,6 +80,11 @@ export default function Exams() {
   const teacherId = localStorage.getItem("teacherId") || "";
   const teacherName = localStorage.getItem("teacherName") || "Teacher";
 
+  // schoolCode-ka macallinka — laga soo akhriyo doc-ka teachers/{teacherId}.
+  // Exam-yada waxaa lagu xardhaa/filter-gareeyaa schoolCode si aan school
+  // kale ugu qaldamin.
+  const [schoolCode, setSchoolCode] = useState("");
+
   useEffect(() => {
     loadTeacherPhoto();
     loadExamHistory();
@@ -93,6 +98,7 @@ export default function Exams() {
       if (teacherSnap.exists()) {
         const data = teacherSnap.data();
         setTeacherPhoto(data.photoUrl || "");
+        setSchoolCode(data.schoolCode || "");
 
         const teacherClasses = Array.isArray(data.classes) ? data.classes : [];
 
@@ -179,6 +185,7 @@ export default function Exams() {
         senderRole: "Teacher",
         senderId: teacherId,
         senderPhoto: teacherPhoto,
+        schoolCode,
         text: `Macallinka ${teacherName} wuxuu soo diray exam-ka (${examType}) - Fasalka ${selectedClass} (${subject}).`,
         type: "exam",
         examType,

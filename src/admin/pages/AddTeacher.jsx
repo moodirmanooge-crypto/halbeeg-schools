@@ -6,6 +6,7 @@ import { db, storage } from "../../firebase/firebase";
 
 import { doc, setDoc, serverTimestamp } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { getSchoolCode, getSchoolName } from "../../utils/schoolContext";
 import {
   GraduationCap,
   User,
@@ -241,6 +242,15 @@ export default function AddTeacher() {
     try {
       setSaving(true);
 
+      // Hubi in school la soo galay (schoolCode) — teacher-ku waa inuu school u gaar ahaadaa.
+      const schoolCode = getSchoolCode();
+      const schoolName = getSchoolName();
+      if (!schoolCode) {
+        alert("Fadlan marka hore School Login samee ka hor inta aadan macalin diiwaan gelin.");
+        setSaving(false);
+        return;
+      }
+
       // Haddii sawir la doortay, marka hore u soo geli Firebase Storage,
       // kadibna soo qaado URL-ka uu ku kaydsan yahay -- kani ayaa loo
       // kaydiyaa sida `teacherPhoto` (field-ka uu TeacherIdCard.jsx filayo).
@@ -268,6 +278,8 @@ export default function AddTeacher() {
       ];
 
       const teacherData = {
+        schoolCode,
+        schoolName,
         fullName,
         username,
         password,

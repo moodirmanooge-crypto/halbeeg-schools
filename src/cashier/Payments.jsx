@@ -3,15 +3,18 @@ import {
   collection,
   getDocs,
   doc,
+  getDoc,
   setDoc,
   serverTimestamp,
+  query,
+  where,
 } from "firebase/firestore";
 
 import { db } from "../firebase/firebase";
 import { theme } from "./theme.js";
 import ReceiptModal from "./ReceiptModal.jsx";
 
-const SCHOOL_NAME = "Rising School"; // beddel magaca dugsigaaga haddii loo baahdo
+const DEFAULT_SCHOOL_NAME = "HalbeegSchools"; // fallback haddii xogta school-ka aan la helin
 
 const currentMonthKey = () => new Date().toISOString().slice(0, 7); // "2026-07"
 
@@ -31,6 +34,11 @@ export default function Payments() {
   const [savingId, setSavingId] = useState(null);
   const [receiptPayment, setReceiptPayment] = useState(null);
 
+  // schoolCode iyo magaca school-ka cashier-ka — laga akhriyo cashier/{cashierId}
+  // + schools/{schoolCode}. Loo isticmaalo filter iyo rasiidka.
+  const [schoolCode, setSchoolCode] = useState("");
+  const [schoolName, setSchoolName] = useState(DEFAULT_SCHOOL_NAME);
+
   useEffect(() => {
     loadData();
   }, []);
@@ -39,9 +47,30 @@ export default function Payments() {
     try {
       setLoading(true);
 
-      // Xogta ardayda saxda ah waxay ku jirtaa collection-ka "students"
-      // ee laga sameeyay Add Student / Bulk Registration.
-      const studentsSnap = await getDocs(collection(db, "students"));
+      // schoolCode-ka cashier-ka + magaca school-ka.
+      const cashierId = localStorage.getItem("cashierId") || "";
+      let code = "";
+      let name = DEFAULT_SCHOOL_NAME;
+      if (cashierId) {
+        const cSnap = await getDoc(doc(db, "cashier", cashierId));
+        if (cSnap.exists()) {
+          code = cSnap.data().schoolCode || "";
+          if (cSnap.data().schoolName) name = cSnap.data().schoolName;
+        }
+      }
+      if (code) {
+        const sSnap = await getDoc(doc(db, "schools", code));
+        if (sSnap.exists()) {
+          name = sSnap.data().schoolName || sSnap.data().name || name;
+        }
+      }
+      setSchoolCode(code);
+      setSchoolName(name);
+
+      // Xogta ardayda saxda ah — kaliya school-kan (schoolCode).
+      const studentsSnap = await getDocs(
+        query(collection(db, "students"), where("schoolCode", "==", code))
+      );
       const studentData = studentsSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         // Ka reeb xogta aan lahayn studentId ama fullName sax ah —
@@ -66,7 +95,9 @@ export default function Payments() {
       // Firestore isaga oo aan si buuxda loo sync-garayn).
       const activeStudentIds = new Set(studentData.map((s) => s.studentId));
 
-      const paymentsSnap = await getDocs(collection(db, "payments"));
+      const paymentsSnap = await getDocs(
+        query(collection(db, "payments"), where("schoolCode", "==", code))
+      );
       const paymentMap = {};
       paymentsSnap.docs.forEach((d) => {
         const data = d.data();
@@ -131,9 +162,10 @@ export default function Payments() {
 
       const paymentRecord = {
         studentId: student.studentId,
+        schoolCode,
         studentName: student.fullName,
         className: student.className || "",
-        schoolName: SCHOOL_NAME,
+        schoolName: schoolName,
         monthlyFee: fee,
         paidAmount: entered,
         remaining: remaining > 0 ? remaining : 0,
@@ -155,7 +187,7 @@ export default function Payments() {
           monthLabel: monthLabel(monthKey),
           paidAmount: entered,
           remaining: remaining > 0 ? remaining : 0,
-          schoolName: SCHOOL_NAME,
+          schoolName: schoolName,
           studentName: student.fullName,
         },
       });

@@ -10,7 +10,7 @@ import {
 import { db } from "../firebase/firebase";
 import { theme } from "./theme.js";
 
-const SCHOOL_NAME = "RISING STAR PRIMARY & SECONDARY SCHOOL";
+const DEFAULT_SCHOOL_NAME = "HalbeegSchools";
 
 // Sanad-dugsiyeedka: bisha 1-8 waxay ka tirsan yihiin sanadkii hore
 // (Jan-Aug), bisha 9-12 waxay ka tirsan yihiin sanadka cusub (Sep-Dec).
@@ -46,6 +46,7 @@ const saveReceiptRecord = async (receiptNo, payment, paidDate) => {
     const receiptRef = doc(collection(db, "receipts"), receiptNo);
     await setDoc(receiptRef, {
       receiptNo,
+      schoolCode: payment.schoolCode || "",
       studentId: payment.studentId || null,
       studentName: payment.studentName || "",
       className: payment.className || "",
@@ -134,7 +135,7 @@ export default function ReceiptModal({ payment, onClose }) {
           ) : (
             <>
               <div className="receipt-header">
-                <div className="receipt-school">{SCHOOL_NAME}</div>
+                <div className="receipt-school">{payment.schoolName || DEFAULT_SCHOOL_NAME}</div>
                 <div className="receipt-sub">SCHOOL FEES RECEIPT</div>
                 <div className="receipt-no">No. {receiptNo}</div>
               </div>

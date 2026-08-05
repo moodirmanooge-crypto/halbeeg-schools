@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, where } from "firebase/firestore";
 
 import { db } from "../firebase/firebase";
 import { theme } from "./theme.js";
@@ -30,10 +30,21 @@ export default function Dashboard() {
     try {
       setLoading(true);
 
+      // schoolCode-ka cashier-ka — laga soo akhriyo doc-kiisa cashier/{cashierId}.
+      // Si dashboard-ku u muujiyo KALIYA xogta school-kiisa.
+      const cashierId = localStorage.getItem("cashierId") || "";
+      let schoolCode = "";
+      if (cashierId) {
+        const cSnap = await getDoc(doc(db, "cashier", cashierId));
+        if (cSnap.exists()) schoolCode = cSnap.data().schoolCode || "";
+      }
+
       // Real enrolled students live in "students" (same collection
       // Payments.jsx reads from) — "cashier" is cashier staff accounts,
       // not students, so counting from it gave wrong totals.
-      const studentsSnap = await getDocs(collection(db, "students"));
+      const studentsSnap = await getDocs(
+        query(collection(db, "students"), where("schoolCode", "==", schoolCode))
+      );
       const studentData = studentsSnap.docs
         .map((d) => ({ id: d.id, ...d.data() }))
         .filter(
@@ -45,7 +56,9 @@ export default function Dashboard() {
         );
       setStudents(studentData);
 
-      const paymentsSnap = await getDocs(collection(db, "payments"));
+      const paymentsSnap = await getDocs(
+        query(collection(db, "payments"), where("schoolCode", "==", schoolCode))
+      );
       setPayments(paymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.log(err);

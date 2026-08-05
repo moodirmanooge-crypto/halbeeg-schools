@@ -94,6 +94,11 @@ export default function Attendance() {
   const teacherId = localStorage.getItem("teacherId") || "";
   const teacherName = localStorage.getItem("teacherName") || "Teacher";
 
+  // schoolCode-ka macallinka — laga soo akhriyo doc-ka teachers/{teacherId}.
+  // Ardayda waxaa lagu filter-gareeyaa schoolCode + className, si macallinku
+  // u arko KALIYA ardayda school-kiisa ee fasalkiisa.
+  const [schoolCode, setSchoolCode] = useState("");
+
   useEffect(() => {
     loadClasses();
     checkHoliday();
@@ -146,6 +151,8 @@ export default function Attendance() {
       }
 
       const data = teacherSnap.data();
+      // Kaydi schoolCode-ka macallinka si ardayda loogu filter-gareeyo school walba.
+      setSchoolCode(data.schoolCode || "");
       const teacherClasses = Array.isArray(data.classes) ? data.classes : [];
 
       const uniqueClassNames = Array.from(
@@ -206,8 +213,14 @@ export default function Attendance() {
       setLoading(true);
       setSessionSaved(false);
 
+      // Kaliya ardayda school-kan (schoolCode) ee fasalkan (className).
+      // Ardaydu waxay leeyihiin ID sida IS0001 — dhammaantood school walba u gaar.
       const snap = await getDocs(
-        query(collection(db, "students"), where("className", "==", className))
+        query(
+          collection(db, "students"),
+          where("schoolCode", "==", schoolCode),
+          where("className", "==", className)
+        )
       );
       // Ka reeb ardayda la calaamadeeyay pendingDeletion — isla markiiba
       // ha ka baxeen liiska Attendance ee macallinka, xitaa haddii
@@ -325,6 +338,7 @@ export default function Attendance() {
 
         await setDoc(doc(db, "attendance", docId), {
           studentId: student.id,
+          schoolCode,
           studentName: student.fullName,
           className: selectedClass,
           teacherId,

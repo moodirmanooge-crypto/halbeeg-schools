@@ -10,9 +10,10 @@ import { db } from "../../firebase/firebase";
 import {
   collection,
   query,
-  orderBy,
+  where,
   onSnapshot,
   doc,
+  getDoc,
   setDoc,
   deleteDoc,
   serverTimestamp,
@@ -20,6 +21,7 @@ import {
 import { Newspaper, Send, Trash2, Heart } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode } from "../../utils/schoolContext";
 import logo from "../../assets/logo.png";
 
 function formatDate(ts) {
@@ -40,12 +42,46 @@ export default function NewsManager() {
   const [posting, setPosting] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(null);
 
+  // Magaca iyo logo-da school-ka admin-ka — laga soo akhriyo schools/{schoolCode}.
+  // Waxaa lagu daraa post kasta si public-ku ugu muujiyo school walba kiisa.
+  const schoolCode = getSchoolCode();
+  const [schoolInfo, setSchoolInfo] = useState({ name: "", logoUrl: "" });
+
   useEffect(() => {
-    const q = query(collection(db, "news"), orderBy("createdAt", "desc"));
+    if (!schoolCode) return;
+    (async () => {
+      try {
+        const snap = await getDoc(doc(db, "schools", schoolCode));
+        if (snap.exists()) {
+          const d = snap.data();
+          setSchoolInfo({
+            name: d.schoolName || d.name || "",
+            logoUrl: d.logoUrl || "",
+          });
+        }
+      } catch (err) {
+        console.log(err);
+      }
+    })();
+  }, [schoolCode]);
+
+  useEffect(() => {
+    if (!schoolCode) {
+      setPosts([]);
+      setLoading(false);
+      return;
+    }
+    // Kaliya post-yada school-kan (schoolCode). orderBy waa la saaray si
+    // looga fogaado composite-index; kala soobeynta waxaa lagu sameeyaa JS-ka.
+    const q = query(collection(db, "news"), where("schoolCode", "==", schoolCode));
     const unsub = onSnapshot(
       q,
       (snap) => {
-        setPosts(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        list.sort(
+          (a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0)
+        );
+        setPosts(list);
         setLoading(false);
       },
       (err) => {
@@ -54,11 +90,15 @@ export default function NewsManager() {
       }
     );
     return () => unsub();
-  }, []);
+  }, [schoolCode]);
 
   const handlePost = async () => {
     if (!text.trim()) {
       alert("Fadlan qor qoraalka wararka.");
+      return;
+    }
+    if (!schoolCode) {
+      alert("Fadlan marka hore School Login samee ka hor inta aadan war qorin.");
       return;
     }
 
@@ -67,6 +107,9 @@ export default function NewsManager() {
       const docId = `${Date.now()}`;
       await setDoc(doc(db, "news", docId), {
         text: text.trim(),
+        schoolCode,
+        schoolName: schoolInfo.name || "",
+        schoolLogoUrl: schoolInfo.logoUrl || "",
         likeCount: 0,
         likedBy: [],
         createdAt: serverTimestamp(),
@@ -138,7 +181,7 @@ export default function NewsManager() {
             }}
           >
             <img
-              src={logo}
+              src={schoolInfo.logoUrl || logo}
               alt=""
               style={{
                 width: 44,
@@ -224,7 +267,7 @@ export default function NewsManager() {
                   >
                     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                       <img
-                        src={logo}
+                        src={post.schoolLogoUrl || schoolInfo.logoUrl || logo}
                         alt=""
                         style={{
                           width: 34,
@@ -236,7 +279,7 @@ export default function NewsManager() {
                       />
                       <div>
                         <div style={{ color: "#fff", fontWeight: 700, fontSize: 13 }}>
-                          HALBEEG SCHOOLS
+                          {post.schoolName || schoolInfo.name || "School"}
                         </div>
                         <div style={{ color: "#8b87ad", fontSize: 11.5 }}>
                           {formatDate(post.createdAt)}

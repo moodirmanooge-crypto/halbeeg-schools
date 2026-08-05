@@ -14,7 +14,7 @@
 
 import { useEffect, useState } from "react";
 import { db } from "../firebase/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import { CalendarDays, Clock, BookOpen } from "lucide-react";
 
 import Sidebar from "./Sidebar";
@@ -128,6 +128,11 @@ export default function ViewTimetable() {
   });
 
   const teacherId = localStorage.getItem("teacherId") || "";
+  // schoolCode-ka macallinka (haddii loo baahdo hufinta dheeraadka ah).
+  // Filtarka aasaasiga ah wuxuu ku salaysan yahay teacherId — macallinku
+  // wuxuu ka tirsan yahay hal school oo keliya, sidaas xiisadihiisu
+  // marnaba uma qaldami karaan school kale.
+  const [schoolCode, setSchoolCode] = useState("");
 
   useEffect(() => {
     loadTimetable();
@@ -145,6 +150,18 @@ export default function ViewTimetable() {
         return;
       }
 
+      // Soo akhri schoolCode-ka macallinka (hufinta dheeraadka ah).
+      let tSchoolCode = "";
+      try {
+        const tSnap = await getDoc(doc(db, "teachers", teacherId));
+        if (tSnap.exists()) {
+          tSchoolCode = tSnap.data().schoolCode || "";
+          setSchoolCode(tSchoolCode);
+        }
+      } catch (e) {
+        console.log(e);
+      }
+
       // Ka soo akhri DHAMMAAN documents-ka collection "timetable".
       // Ma isticmaaleyno where()/orderBy() halkan si aan uga fogaanno
       // Firestore composite-index error-ka; shaandheynta waxaa lagu
@@ -157,6 +174,17 @@ export default function ViewTimetable() {
         const day = data.day;
         const className = data.className;
         const sessions = Array.isArray(data.sessions) ? data.sessions : [];
+
+        // Hufinta dheeraadka ah: haddii timetable doc-ku leeyahay schoolCode
+        // oo aan la mid ahayn kan macallinka, ka bood gabi ahaanba. Haddii
+        // uusan schoolCode lahayn (xogtii hore), sida caadiga ah u soco.
+        if (
+          tSchoolCode &&
+          data.schoolCode &&
+          data.schoolCode !== tSchoolCode
+        ) {
+          return;
+        }
 
         sessions.forEach((s) => {
           // Kaliya sessions-ka teacherId-giisu la mid yahay macallinka

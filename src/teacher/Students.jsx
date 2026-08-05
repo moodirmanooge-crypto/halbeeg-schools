@@ -48,6 +48,10 @@ export default function Students() {
   const teacherId = localStorage.getItem("teacherId") || "";
   const teacherName = localStorage.getItem("teacherName") || "Teacher";
 
+  // schoolCode-ka macallinka — ardayda iyo attendance-ka waxaa lagu filter-gareeyaa
+  // schoolCode si aan school kale ardaydiisa loo arag.
+  const [schoolCode, setSchoolCode] = useState("");
+
   useEffect(() => {
     loadData();
   }, []);
@@ -78,6 +82,8 @@ export default function Students() {
       }
 
       const data = teacherSnap.data();
+      const tSchoolCode = data.schoolCode || "";
+      setSchoolCode(tSchoolCode);
       const teacherClasses = Array.isArray(data.classes) ? data.classes : [];
 
       const uniqueClassNames = Array.from(
@@ -95,6 +101,7 @@ export default function Students() {
         const studentsSnap = await getDocs(
           query(
             collection(db, "students"),
+            where("schoolCode", "==", tSchoolCode),
             where("className", "in", uniqueClassNames.slice(0, 10))
           )
         );
@@ -107,6 +114,7 @@ export default function Students() {
         const attSnap = await getDocs(
           query(
             collection(db, "attendance"),
+            where("schoolCode", "==", tSchoolCode),
             where("className", "in", uniqueClassNames.slice(0, 10))
           )
         );

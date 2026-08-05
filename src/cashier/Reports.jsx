@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, Fragment } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc, query, where } from "firebase/firestore";
 
 import { db } from "../firebase/firebase";
 import { theme } from "./theme.js";
@@ -28,10 +28,22 @@ export default function Reports() {
     try {
       setLoading(true);
 
-      const studentsSnap = await getDocs(collection(db, "cashier"));
+      // schoolCode-ka cashier-ka hadda soo galay — laga akhriyo cashier/{cashierId}.
+      const cashierId = localStorage.getItem("cashierId") || "";
+      let schoolCode = "";
+      if (cashierId) {
+        const cSnap = await getDoc(doc(db, "cashier", cashierId));
+        if (cSnap.exists()) schoolCode = cSnap.data().schoolCode || "";
+      }
+
+      const studentsSnap = await getDocs(
+        query(collection(db, "cashier"), where("schoolCode", "==", schoolCode))
+      );
       setStudents(studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
 
-      const paymentsSnap = await getDocs(collection(db, "payments"));
+      const paymentsSnap = await getDocs(
+        query(collection(db, "payments"), where("schoolCode", "==", schoolCode))
+      );
       setPayments(paymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.log(err);
