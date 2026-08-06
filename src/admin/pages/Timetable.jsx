@@ -25,6 +25,7 @@ import {
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode } from "../../utils/schoolContext";
 
 // Fixed class order: 1 -> 8 (primary), then F1 -> F4 (secondary/form)
 const CLASS_ORDER = ["1", "2", "3", "4", "5", "6", "7", "8", "F1", "F2", "F3", "F4"];
@@ -554,6 +555,11 @@ function SubjectSelect({ value, options, onChange }) {
 
 
 export default function Timetable() {
+  // schoolCode-ka school-ka admin-ka — dhammaan timetable doc-yada waxaa
+  // hordhac loogu darayaa (`${schoolCode}__${className}__${day}`) si laba
+  // school oo isku fasal magac leh aysan isugu qaldamin, oo mid walbana
+  // kaliya kiisa la muujiyo.
+  const schoolCode = getSchoolCode();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [teachers, setTeachers] = useState({}); // id -> { fullName, photoUrl, subject, classes }
@@ -570,9 +576,19 @@ export default function Timetable() {
   async function load() {
     try {
       setLoading(true);
+      if (!schoolCode) {
+        setTeachers({});
+        setTimetableDocs({});
+        setLoading(false);
+        return;
+      }
       const [teachersSnap, ttSnap] = await Promise.all([
-        getDocs(collection(db, "teachers")),
-        getDocs(collection(db, "timetable")),
+        getDocs(
+          query(collection(db, "teachers"), where("schoolCode", "==", schoolCode))
+        ),
+        getDocs(
+          query(collection(db, "timetable"), where("schoolCode", "==", schoolCode))
+        ),
       ]);
 
       const teacherMap = {};
@@ -640,7 +656,7 @@ export default function Timetable() {
   // so rows never jump around when this effect re-runs.
   useEffect(() => {
     if (!selectedClass) return;
-    const key = `${selectedClass}__${activeDay}`;
+    const key = `${schoolCode}__${selectedClass}__${activeDay}`;
     const existing = timetableDocs[key];
     setDraftSessions(
       existing?.sessions?.length
@@ -686,7 +702,11 @@ export default function Timetable() {
   async function syncStudentsTimetable(className, updatedTimetableDocs) {
     try {
       const studentsSnap = await getDocs(
-        query(collection(db, "students"), where("className", "==", className))
+        query(
+          collection(db, "students"),
+          where("schoolCode", "==", schoolCode),
+          where("className", "==", className)
+        )
       );
       if (studentsSnap.empty) return;
 
@@ -695,7 +715,7 @@ export default function Timetable() {
       // (wakhtiga bilowga) sababtoo ah tani waa view/summary oo kaliya —
       // kuma saameeyo sida xiisadaha loogu darayo editor-ka.
       const weekSchedule = DAYS.map((d) => {
-        const key = `${className}__${d.key}`;
+        const key = `${schoolCode}__${className}__${d.key}`;
         const sessions = sortedBySessionTime(updatedTimetableDocs[key]?.sessions || []).map(
           (s) => ({
             sessionNumber: s.sessionNumber,
@@ -725,7 +745,7 @@ export default function Timetable() {
   async function saveDay() {
     if (!selectedClass) return;
     setSaving(true);
-    const key = `${selectedClass}__${activeDay}`;
+    const key = `${schoolCode}__${selectedClass}__${activeDay}`;
 
     // Skip rows with no teacher selected to avoid saving blank sessions.
     // Order is preserved as-is (no time-based sorting) so the saved
@@ -742,6 +762,7 @@ export default function Timetable() {
         delete updatedDocs[key];
       } else {
         const payload = {
+          schoolCode,
           className: selectedClass,
           day: activeDay,
           sessions: cleanSessions,
@@ -1015,7 +1036,7 @@ export default function Timetable() {
                 {DAYS.map((d) => {
                   const isActive = d.key === activeDay;
                   const hasSessions =
-                    (timetableDocs[`${selectedClass}__${d.key}`]?.sessions || []).length > 0;
+                    (timetableDocs[`${schoolCode}__${selectedClass}__${d.key}`]?.sessions || []).length > 0;
                   return (
                     <button
                       key={d.key}
@@ -1263,7 +1284,7 @@ export default function Timetable() {
                 activeDay={activeDay}
                 onEditDay={(dayKey) => setActiveDay(dayKey)}
                 onQuickRemoveSession={async (dayKey, sessionId) => {
-                  const key = `${selectedClass}__${dayKey}`;
+                  const key = `${schoolCode}__${selectedClass}__${dayKey}`;
                   const existing = timetableDocs[key];
                   if (!existing) return;
                   const remaining = withSessionNumbers(
@@ -1277,6 +1298,7 @@ export default function Timetable() {
                       delete updatedDocs[key];
                     } else {
                       const payload = {
+                        schoolCode,
                         className: selectedClass,
                         day: dayKey,
                         sessions: remaining,
@@ -1315,7 +1337,7 @@ function WeekSummary({
   onQuickRemoveSession,
 }) {
   const rows = DAYS.map((d) => {
-    const key = `${selectedClass}__${d.key}`;
+    const key = `${schoolCode}__${selectedClass}__${d.key}`;
     // Summary view sorts by time for readability — this doesn't touch the editor state.
     const sessions = sortedBySessionTime(
       withSessionNumbers(timetableDocs[key]?.sessions || [])
