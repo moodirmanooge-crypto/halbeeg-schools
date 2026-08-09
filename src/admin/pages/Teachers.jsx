@@ -7,6 +7,8 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
@@ -24,6 +26,7 @@ import {
   Save,
   Loader2,
 } from "lucide-react";
+import { getSchoolCode } from "../../utils/schoolContext";
 
 const weekDays = [
   "Monday",
@@ -55,7 +58,17 @@ export default function Teachers() {
   async function fetchTeachers() {
     try {
       setLoading(true);
-      const snap = await getDocs(collection(db, "teachers"));
+      // Kaliya macallimiinta school-kan (schoolCode). Admin walba wuxuu arkaa
+      // KALIYA macallimiintiisa, school kale ma arki karo.
+      const schoolCode = getSchoolCode();
+      if (!schoolCode) {
+        setTeachers([]);
+        setLoading(false);
+        return;
+      }
+      const snap = await getDocs(
+        query(collection(db, "teachers"), where("schoolCode", "==", schoolCode))
+      );
       setTeachers(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.log(err);

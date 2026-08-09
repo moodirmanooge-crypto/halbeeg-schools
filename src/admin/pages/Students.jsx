@@ -7,6 +7,8 @@ import {
   doc,
   updateDoc,
   deleteDoc,
+  query,
+  where,
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import Sidebar from "../components/Sidebar";
@@ -33,6 +35,7 @@ import {
   Camera,
   Hash,
 } from "lucide-react";
+import { getSchoolCode } from "../../utils/schoolContext";
 
 const classOptions = ["1", "2", "3", "4", "5", "6", "7", "8", "F1", "F2", "F3", "F4"];
 
@@ -65,7 +68,17 @@ export default function Students() {
   async function fetchStudents() {
     try {
       setLoading(true);
-      const snap = await getDocs(collection(db, "students"));
+      // Kaliya ardayda school-kan (schoolCode). Admin walba wuxuu arkaa
+      // KALIYA ardaydiisa, school kale ma arki karo.
+      const schoolCode = getSchoolCode();
+      if (!schoolCode) {
+        setStudents([]);
+        setLoading(false);
+        return;
+      }
+      const snap = await getDocs(
+        query(collection(db, "students"), where("schoolCode", "==", schoolCode))
+      );
       setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.log(err);

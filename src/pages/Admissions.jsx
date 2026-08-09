@@ -1,10 +1,10 @@
 // src/pages/Admissions.jsx
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import "../styles/admissions.css";
 import logo from "../assets/logo.png";
 import { Link } from "react-router-dom";
 import { db, storage } from "../firebase/firebase";
-import { doc, setDoc } from "firebase/firestore";
+import { doc, setDoc, collection, getDocs } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 
 const SUPPORT_WHATSAPP = "252617390261";
@@ -66,10 +66,13 @@ const classOptions = [
 ];
 
 const emptyForm = {
+  schoolCode: "",
+  schoolName: "",
   studentName: "",
   studentPhone: "",
   dob: "",
   desiredClass: "",
+  previousSchoolStatus: "",
   previousSchool: "",
   parentName: "",
   parentPhone: "",
@@ -83,6 +86,28 @@ export default function Admissions() {
   const [photoPreview, setPhotoPreview] = useState(null);
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  // Dhammaan schools-ka system-ka — arday isdiiwaangelinaya wuxuu ka dooranayaa
+  // school-ka uu rabo. Codsiga wuxuu tagayaa KALIYA school-kaas.
+  const [schools, setSchools] = useState([]);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const snap = await getDocs(collection(db, "schools"));
+        const list = snap.docs
+          .map((d) => ({ id: d.id, ...d.data() }))
+          // Kaliya schools-ka firfircoon (aan la joojin/dhicin).
+          .filter((s) => s.status !== "Expired");
+        list.sort((a, b) =>
+          (a.name || a.schoolName || "").localeCompare(b.name || b.schoolName || "")
+        );
+        setSchools(list);
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+  }, []);
 
   const handleChange = (e) => {
     setForm({ ...form, [e.target.name]: e.target.value });
@@ -103,6 +128,10 @@ export default function Admissions() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (!form.schoolCode) {
+      alert("Fadlan dooro Iskuulka aad rabto inaad ka codsato.");
+      return;
+    }
     if (!form.studentName.trim()) {
       alert("Fadlan geli Magaca Ardayga.");
       return;
@@ -113,6 +142,14 @@ export default function Admissions() {
     }
     if (!form.dob) {
       alert("Fadlan geli Taariikhda Dhalashada.");
+      return;
+    }
+    if (!form.previousSchoolStatus) {
+      alert("Fadlan dooro Previous School (Yes ama No).");
+      return;
+    }
+    if (form.previousSchoolStatus === "Yes" && !form.previousSchool.trim()) {
+      alert("Fadlan geli magaca iskuulkii hore.");
       return;
     }
     if (!form.studentPhone || form.studentPhone.length !== 9) {
@@ -147,11 +184,15 @@ export default function Admissions() {
       const photoUrl = await getDownloadURL(photoRef);
 
       await setDoc(doc(db, "Admissions", docId), {
+        schoolCode: form.schoolCode,
+        schoolName: form.schoolName,
         studentName: form.studentName,
         studentPhone: form.studentPhone,
         dob: form.dob,
         desiredClass: form.desiredClass,
-        previousSchool: form.previousSchool,
+        previousSchoolStatus: form.previousSchoolStatus,
+        previousSchool:
+          form.previousSchoolStatus === "Yes" ? form.previousSchool : "",
         parentName: form.parentName,
         parentPhone: form.parentPhone,
         address: form.address,
@@ -277,6 +318,40 @@ export default function Admissions() {
             ) : (
               <form className="adm-form" onSubmit={handleSubmit}>
                 <div className="adm-form-section-label">
+                  Dooro Iskuulka (waajib)
+                </div>
+                <div className="adm-field">
+                  <label>Iskuulka aad rabto</label>
+                  <select
+                    name="schoolCode"
+                    value={form.schoolCode}
+                    onChange={(e) => {
+                      const code = e.target.value;
+                      const picked = schools.find(
+                        (s) => (s.code || s.schoolCode || s.id) === code
+                      );
+                      setForm((prev) => ({
+                        ...prev,
+                        schoolCode: code,
+                        schoolName: picked
+                          ? picked.name || picked.schoolName || ""
+                          : "",
+                      }));
+                    }}
+                  >
+                    <option value="">— Dooro Iskuulka —</option>
+                    {schools.map((s) => (
+                      <option
+                        key={s.id}
+                        value={s.code || s.schoolCode || s.id}
+                      >
+                        {s.name || s.schoolName || s.id}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="adm-form-section-label">
                   Sawirka Ardayga (waajib)
                 </div>
                 <label htmlFor="studentPhoto" className="adm-photo-input">
@@ -343,14 +418,35 @@ export default function Admissions() {
                     </select>
                   </div>
                   <div className="adm-field">
-                    <label>Previous School (waajib)</label>
-                    <input
-                      name="previousSchool"
-                      value={form.previousSchool}
-                      onChange={handleChange}
-                      placeholder="Dugsigii hore"
-                    />
+                    <label>Previous School? (waajib)</label>
+                    <select
+                      name="previousSchoolStatus"
+                      value={form.previousSchoolStatus}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          previousSchoolStatus: e.target.value,
+                          previousSchool:
+                            e.target.value === "Yes" ? prev.previousSchool : "",
+                        }))
+                      }
+                    >
+                      <option value="">— Dooro —</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
                   </div>
+                  {form.previousSchoolStatus === "Yes" && (
+                    <div className="adm-field">
+                      <label>Magaca Iskuulkii Hore (waajib)</label>
+                      <input
+                        name="previousSchool"
+                        value={form.previousSchool}
+                        onChange={handleChange}
+                        placeholder="Magaca school-ka hore"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 <div className="adm-form-section-label">

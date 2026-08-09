@@ -2,10 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { db } from "../../firebase/firebase";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where, doc, getDoc } from "firebase/firestore";
 import { Printer, Download, RefreshCcw } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode } from "../../utils/schoolContext";
 import logo from "../../assets/logo.png";
 
 // ---- grade helper -----------------------------------------------------
@@ -60,16 +61,45 @@ export default function ResultsByClass() {
   const printRefs = useRef({}); 
   const [pendingAction, setPendingAction] = useState({}); 
 
+  // schoolCode-ka admin-ka + magaca/logo-da school-ka (loo isticmaalo
+  // filter-ka ardayda/natiijada iyo madaxa daabacaadda).
+  const schoolCode = getSchoolCode();
+  const [schoolInfo, setSchoolInfo] = useState({ name: "", logoUrl: "" });
+
   useEffect(() => {
     fetchData();
+    (async () => {
+      if (!schoolCode) return;
+      try {
+        const snap = await getDoc(doc(db, "schools", schoolCode));
+        if (snap.exists()) {
+          const d = snap.data();
+          setSchoolInfo({
+            name: d.schoolName || d.name || "",
+            logoUrl: d.logoUrl || "",
+          });
+        }
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function fetchData() {
     try {
       setLoading(true);
 
-      // 1) Dhammaan xogta ardayda
-      const studentsSnap = await getDocs(collection(db, "students"));
+      if (!schoolCode) {
+        setClassGroups([]);
+        setLoading(false);
+        return;
+      }
+
+      // 1) Kaliya ardayda school-kan
+      const studentsSnap = await getDocs(
+        query(collection(db, "students"), where("schoolCode", "==", schoolCode))
+      );
       const studentsById = {};
       studentsSnap.docs.forEach((d) => {
         const data = d.data();
@@ -82,8 +112,10 @@ export default function ResultsByClass() {
         };
       });
 
-      // 2) Dhammaan natiijooyinka
-      const resultsSnap = await getDocs(collection(db, "results"));
+      // 2) Kaliya natiijooyinka school-kan
+      const resultsSnap = await getDocs(
+        query(collection(db, "results"), where("schoolCode", "==", schoolCode))
+      );
       const resultsList = resultsSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
 
       // 3) U kala saar className
@@ -508,10 +540,10 @@ export default function ResultsByClass() {
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                        <img src={logo} alt="" style={{ width: 56, height: 56, objectFit: "contain" }} />
+                        <img src={schoolInfo.logoUrl || logo} alt="" style={{ width: 56, height: 56, objectFit: "contain" }} />
                         <div>
                           <h2 style={{ margin: 0, fontSize: 20, fontWeight: 800, color: "#111827" }}>
-                            HALBEEG SCHOOLS
+                            {schoolInfo.name || "HALBEEG SCHOOLS"}
                           </h2>
                           <p style={{ margin: "2px 0 0", fontSize: 11.5, color: "#6B7280" }}>
                             Submitted: {formatDateTime(group.submittedAt)}

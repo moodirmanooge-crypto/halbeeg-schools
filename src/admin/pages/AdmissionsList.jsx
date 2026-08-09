@@ -6,6 +6,7 @@ import {
   onSnapshot,
   orderBy,
   query,
+  where,
   doc,
   updateDoc,
 } from "firebase/firestore";
@@ -21,6 +22,7 @@ import {
   Download,
   User,
 } from "lucide-react";
+import { getSchoolCode } from "../../utils/schoolContext";
 
 export default function AdmissionsList() {
   const [admissions, setAdmissions] = useState([]);
@@ -29,11 +31,27 @@ export default function AdmissionsList() {
   const [filter, setFilter] = useState("All");
 
   useEffect(() => {
-    const q = query(collection(db, "Admissions"), orderBy("submittedAt", "desc"));
+    const schoolCode = getSchoolCode();
+    if (!schoolCode) {
+      setAdmissions([]);
+      setLoading(false);
+      return;
+    }
+    // Kaliya codsiyada school-kan. orderBy waa la saaray si looga fogaado
+    // composite-index; kala soobaynta waxaa lagu sameeyaa JS-ka.
+    const q = query(
+      collection(db, "Admissions"),
+      where("schoolCode", "==", schoolCode)
+    );
     const unsub = onSnapshot(
       q,
       (snap) => {
         const rows = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        rows.sort((a, b) => {
+          const ta = a.submittedAt?.seconds || 0;
+          const tb = b.submittedAt?.seconds || 0;
+          return tb - ta;
+        });
         setAdmissions(rows);
         setLoading(false);
       },

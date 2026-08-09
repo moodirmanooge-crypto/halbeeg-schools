@@ -10,7 +10,7 @@
 // its photos/videos grouped together, instead of several separate
 // posts. The doc also carries the shared caption, likeCount, likedBy[],
 // and comments[] — the same shape the public Gallery.jsx reads and
-// lets visitors like/comment/share.
+// lets visitors like/comment/share..
 //
 // Each post is also tagged with the school that made it: schoolCode is
 // read from the logged-in admin's dashboard context, and schoolName /

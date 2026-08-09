@@ -126,8 +126,15 @@ export default function Sidebar() {
   }, []);
 
   useEffect(() => {
+    const code = getSchoolCode();
+    if (!code) {
+      setPendingAdmissions(0);
+      return;
+    }
+    // Kaliya codsiyada sugaya ee school-kan.
     const q = query(
       collection(db, "Admissions"),
+      where("schoolCode", "==", code),
       where("status", "==", "Pending")
     );
     const unsub = onSnapshot(
