@@ -488,12 +488,12 @@ function CardBack({ student, studentId }) {
   const qrTarget =
     student?.idCardPageUrl ||
     (studentId
-      ? `https://resingstarschools.com/verify/student/${encodeURIComponent(studentId)}`
+      ? `https://HALBEEGstarschools.com/verify/student/${encodeURIComponent(studentId)}`
       : "") ||
     student?.idCardImageUrl ||
     student?.idCardFrontUrl ||
     student?.studentPhoto ||
-    "https://resingstarschools.com";
+    "https://HALBEEGstarschools.com";
 
   const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=0&data=${encodeURIComponent(
     qrTarget

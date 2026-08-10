@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 
 const SUPPORT_WHATSAPP = "252617390261";
-const SUPPORT_EMAIL = "risingstar0261@gmail.com";
+const SUPPORT_EMAIL = "halbeegschools@gmail.com";
 const SUPPORT_PHONE_DISPLAY = "+252 61 7390261";
 const SUPPORT_LOCATION = "Mogadishu, Somalia";
 
@@ -175,12 +175,19 @@ export default function Home() {
         return;
       }
 
-      // Hubi in school-ku uusan dhicin (expired) ama la joojin.
+      // Hubi in school-ku uusan dhicin (expired) ama la joojin (disabled).
       const today = new Date().toISOString().split("T")[0];
+      if (d.status === "Disabled") {
+        setSchoolLoginError("School-kan waa la joojiyay. La xiriir maamulaha guud.");
+        return;
+      }
       const isExpired =
         (d.expiryDate && d.expiryDate < today) || d.status === "Expired";
       if (isExpired) {
-        setSchoolLoginError("School-kan rukunkiisu waa dhacay. La xiriir maamulaha.");
+        // Rukunku wuu dhacay — geey bogga cusbooneysiinta (renewal).
+        const code = d.schoolCode || d.code || codeInput;
+        setShowSchoolForm(false);
+        navigate(`/renew/${code}`);
         return;
       }
 
@@ -209,7 +216,7 @@ export default function Home() {
           <img src={logo} className="brand-logo" alt="HALBEEG SCHOOLS logo" />
           <div className="brand-text">
             <span className="brand-name">HALBEEG SCHOOLS</span>
-            <span className="brand-tagline">RISING STAR PRIMARY &amp; SECONDARY SCHOOL</span>
+            <span className="brand-tagline">HALBEEG  PRIMARY &amp; SECONDARY SCHOOL</span>
           </div>
         </Link>
 
@@ -430,7 +437,7 @@ export default function Home() {
           <img src={logo} className="footer-logo" alt="HALBEEG SCHOOLS logo" />
           <div>
             <div className="footer-school-name">HALBEEG SCHOOLS</div>
-            <div className="footer-school-tagline">RISING STAR PRIMARY &amp; SECONDARY SCHOOL</div>
+            <div className="footer-school-tagline">HALBEEGG  PRIMARY &amp; SECONDARY SCHOOL</div>
           </div>
         </div>
         <div className="home-footer-contact">

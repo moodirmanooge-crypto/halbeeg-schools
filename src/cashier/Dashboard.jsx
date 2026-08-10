@@ -1,209 +1,182 @@
-import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs, doc, getDoc, query, where } from "firebase/firestore";
-
+import { useEffect, useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebase";
 import { theme } from "./theme.js";
 
-const currentMonthKey = () => new Date().toISOString().slice(0, 7);
+const NAV_ITEMS = [
+  { to: "/cashier/dashboard", label: "Dashboard", icon: "📊" },
+  { to: "/cashier/payments", label: "Payments", icon: "💳" },
+  { to: "/cashier/exam-payments", label: "Exam Payments", icon: "🪪" },
+  { to: "/cashier/reports", label: "Reports", icon: "📁" },
+  { to: "/cashier/profile", label: "Profile", icon: "👤" },
+];
 
-const isToday = (ts) => {
-  if (!ts || !ts.seconds) return false;
-  const d = new Date(ts.seconds * 1000);
-  const now = new Date();
-  return (
-    d.getFullYear() === now.getFullYear() &&
-    d.getMonth() === now.getMonth() &&
-    d.getDate() === now.getDate()
-  );
-};
+export default function Sidebar() {
+  const location = useLocation();
 
-export default function Dashboard() {
-  const [students, setStudents] = useState([]);
-  const [payments, setPayments] = useState([]);
-  const [loading, setLoading] = useState(true);
+  // Magaca iyo logo-da school-ka cashier-ka — laga soo akhriyo
+  // cashier/{cashierId} -> schools/{schoolCode}. Sidaas cashier walba
+  // wuxuu arkaa school-kiisa gaarka ah.
+  const [school, setSchool] = useState({ name: "", logoUrl: "" });
 
   useEffect(() => {
-    loadData();
+    const cashierId = localStorage.getItem("cashierId") || "";
+    if (!cashierId) return;
+    (async () => {
+      try {
+        const cSnap = await getDoc(doc(db, "cashier", cashierId));
+        if (!cSnap.exists()) return;
+        const code = cSnap.data().schoolCode || "";
+        let name = cSnap.data().schoolName || "";
+        let logoUrl = "";
+        if (code) {
+          const sSnap = await getDoc(doc(db, "schools", code));
+          if (sSnap.exists()) {
+            name = sSnap.data().schoolName || sSnap.data().name || name;
+            logoUrl = sSnap.data().logoUrl || "";
+          }
+        }
+        setSchool({ name, logoUrl });
+      } catch (e) {
+        console.log(e);
+      }
+    })();
   }, []);
 
-  const loadData = async () => {
-    try {
-      setLoading(true);
-
-      // schoolCode-ka cashier-ka — laga soo akhriyo doc-kiisa cashier/{cashierId}.
-      // Si dashboard-ku u muujiyo KALIYA xogta school-kiisa.
-      const cashierId = localStorage.getItem("cashierId") || "";
-      let schoolCode = "";
-      if (cashierId) {
-        const cSnap = await getDoc(doc(db, "cashier", cashierId));
-        if (cSnap.exists()) schoolCode = cSnap.data().schoolCode || "";
-      }
-
-      // Real enrolled students live in "students" (same collection
-      // Payments.jsx reads from) — "cashier" is cashier staff accounts,
-      // not students, so counting from it gave wrong totals.
-      const studentsSnap = await getDocs(
-        query(collection(db, "students"), where("schoolCode", "==", schoolCode))
-      );
-      const studentData = studentsSnap.docs
-        .map((d) => ({ id: d.id, ...d.data() }))
-        .filter(
-          (s) =>
-            s.studentId &&
-            String(s.studentId).trim() !== "" &&
-            s.fullName &&
-            String(s.fullName).trim() !== ""
-        );
-      setStudents(studentData);
-
-      const paymentsSnap = await getDocs(
-        query(collection(db, "payments"), where("schoolCode", "==", schoolCode))
-      );
-      setPayments(paymentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    } catch (err) {
-      console.log(err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const stats = useMemo(() => {
-    const monthKey = currentMonthKey();
-    const monthPayments = payments.filter((p) => p.monthKey === monthKey);
-
-    const todaysCollection = monthPayments
-      .filter((p) => isToday(p.createdAt))
-      .reduce((sum, p) => sum + Number(p.paidAmount || 0), 0);
-
-    const monthlyCollection = monthPayments.reduce(
-      (sum, p) => sum + Number(p.paidAmount || 0),
-      0
-    );
-
-    // A student counts as "Paid" for the month only if their record
-    // for this monthKey has status "Paid".
-    const paidStudentIds = new Set(
-      monthPayments.filter((p) => p.status === "Paid").map((p) => p.studentId)
-    );
-
-    // Free students are excluded from paid/remaining counts entirely —
-    // they never owe a fee, so they shouldn't inflate "remaining".
-    const payableStudents = students.filter((s) => s.feeType !== "Free");
-
-    const studentsPaid = payableStudents.filter((s) =>
-      paidStudentIds.has(s.studentId)
-    ).length;
-    const studentsRemaining = Math.max(
-      payableStudents.length - studentsPaid,
-      0
-    );
-
-    return {
-      todaysCollection,
-      monthlyCollection,
-      studentsPaid,
-      studentsRemaining,
-    };
-  }, [students, payments]);
-
-  const STATS = [
-    {
-      label: "Today's Collection",
-      value: `$${stats.todaysCollection}`,
-      accent: theme.colors.mint,
-      icon: "💵",
-    },
-    {
-      label: "Monthly Collection",
-      value: `$${stats.monthlyCollection}`,
-      accent: theme.colors.brand,
-      icon: "📈",
-    },
-    {
-      label: "Students Paid",
-      value: stats.studentsPaid,
-      accent: theme.colors.mint,
-      icon: "✅",
-    },
-    {
-      label: "Students Remaining",
-      value: stats.studentsRemaining,
-      accent: theme.colors.amber,
-      icon: "⏳",
-    },
-  ];
-
   return (
-    <div>
-      <header style={{ marginBottom: 28 }}>
-        <h1 style={styles.title}>Cashier Dashboard</h1>
-        <p style={styles.subtitle}>Overview of today's payment activity</p>
-      </header>
-
-      {loading ? (
-        <p style={{ color: theme.colors.inkMuted }}>Loading dashboard...</p>
-      ) : (
-        <div style={styles.grid}>
-          {STATS.map((s) => (
-            <div key={s.label} style={styles.card}>
-              <div style={{ ...styles.iconWrap, background: `${s.accent}1A` }}>
-                <span style={{ fontSize: 20 }}>{s.icon}</span>
-              </div>
-              <div style={styles.value}>{s.value}</div>
-              <div style={styles.label}>{s.label}</div>
-            </div>
-          ))}
+    <div style={styles.sidebar}>
+      <div style={styles.brandRow}>
+        {school.logoUrl ? (
+          <img
+            src={school.logoUrl}
+            alt=""
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: theme.radius.md,
+              objectFit: "cover",
+              background: "rgba(255,255,255,0.08)",
+            }}
+          />
+        ) : (
+          <span style={styles.brandCoin}>💰</span>
+        )}
+        <div>
+          <div style={styles.brandTitle}>
+            {school.name || "CASHIER"}
+          </div>
+          <div style={styles.brandSub}>Finance Desk</div>
         </div>
-      )}
+      </div>
+
+      <nav style={styles.nav}>
+        {NAV_ITEMS.map((item) => {
+          const active = location.pathname === item.to;
+          return (
+            <Link
+              key={item.to}
+              to={item.to}
+              style={{
+                ...styles.link,
+                ...(active ? styles.linkActive : {}),
+              }}
+            >
+              <span style={styles.linkIcon}>{item.icon}</span>
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div style={styles.footer}>
+        <div style={styles.footerDot} />
+        Synced just now
+      </div>
     </div>
   );
 }
 
 const styles = {
-  title: {
-    fontFamily: theme.font.display,
-    fontWeight: 800,
-    fontSize: 28,
-    color: theme.colors.ink,
-    margin: 0,
+  sidebar: {
+    width: 250,
+    minHeight: "100vh",
+    background: theme.colors.brand,
+    padding: "28px 18px",
+    display: "flex",
+    flexDirection: "column",
+    fontFamily: theme.font.body,
   },
-  subtitle: {
-    color: theme.colors.inkMuted,
-    fontSize: 14,
-    marginTop: 6,
+  brandRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "0 8px 28px 8px",
+    borderBottom: `1px solid rgba(255,255,255,0.12)`,
+    marginBottom: 24,
   },
-  grid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: 20,
-  },
-  card: {
-    background: theme.colors.card,
-    borderRadius: theme.radius.lg,
-    padding: 24,
-    boxShadow: theme.shadow.card,
-    border: `1px solid ${theme.colors.border}`,
-  },
-  iconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: theme.radius.sm,
+  brandCoin: {
+    fontSize: 26,
+    width: 44,
+    height: 44,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    background: "rgba(255,255,255,0.08)",
+    borderRadius: theme.radius.md,
   },
-  value: {
+  brandTitle: {
+    color: "#FFFFFF",
     fontFamily: theme.font.display,
     fontWeight: 800,
-    fontSize: 26,
-    color: theme.colors.ink,
-    fontVariantNumeric: "tabular-nums",
+    fontSize: 16,
+    letterSpacing: 1,
   },
-  label: {
-    color: theme.colors.inkMuted,
-    fontSize: 13.5,
-    marginTop: 4,
-    fontWeight: 500,
+  brandSub: {
+    color: "rgba(255,255,255,0.55)",
+    fontSize: 12,
+    marginTop: 2,
+  },
+  nav: {
+    display: "flex",
+    flexDirection: "column",
+    gap: 6,
+  },
+  link: {
+    display: "flex",
+    alignItems: "center",
+    gap: 12,
+    padding: "12px 14px",
+    borderRadius: theme.radius.sm,
+    textDecoration: "none",
+    color: "rgba(255,255,255,0.75)",
+    fontWeight: 600,
+    fontSize: 14.5,
+    transition: "background .15s ease, color .15s ease",
+  },
+  linkActive: {
+    background: theme.colors.mint,
+    color: theme.colors.brandDark,
+  },
+  linkIcon: {
+    fontSize: 16,
+    width: 20,
+    textAlign: "center",
+  },
+  footer: {
+    marginTop: "auto",
+    display: "flex",
+    alignItems: "center",
+    gap: 8,
+    color: "rgba(255,255,255,0.45)",
+    fontSize: 12,
+    paddingTop: 20,
+    borderTop: "1px solid rgba(255,255,255,0.12)",
+  },
+  footerDot: {
+    width: 7,
+    height: 7,
+    borderRadius: "50%",
+    background: theme.colors.mint,
   },
 };

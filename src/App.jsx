@@ -16,6 +16,7 @@ import Login from "./pages/Login";
 import SchoolLogin from "./pages/SchoolLogin";
 import SuperAdminLogin from "./pages/SuperAdminLogin";
 import SuperAdminDashboard from "./pages/SuperAdminDashboard";
+import RenewAccount from "./pages/RenewAccount";
 
 // ADMIN
 import Dashboard from "./admin/pages/Dashboard";
@@ -102,6 +103,9 @@ function App() {
         {/* Super Admin Routes */}
         <Route path="/super-admin-login" element={<SuperAdminLogin />} />
         <Route path="/super-admin/dashboard" element={<SuperAdminDashboard />} />
+
+        {/* Bogga cusbooneysiinta (renewal) — marka rukunka school-ku dhaco. */}
+        <Route path="/renew/:schoolCode" element={<RenewAccount />} />
 
         {/* Backward Compatibility Logins */}
         <Route path="/admin-login" element={<Login role="Admin" />} />

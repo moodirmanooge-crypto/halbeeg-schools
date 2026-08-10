@@ -15,6 +15,7 @@ import { doc, setDoc, getDoc } from "firebase/firestore";
 import { UserPlus, Mail, Lock, User as UserIcon, ShieldCheck } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode, getSchoolName } from "../../utils/schoolContext";
 
 // Kept in sync with admin/components/Sidebar.jsx `menus` array — label +
 // path pairs a Super Admin can hand out to a sub-admin.
@@ -92,6 +93,15 @@ export default function AddSubAdmin() {
     try {
       setSaving(true);
 
+      // Hubi in school la soo galay — admin-hoosaadku waa inuu school u gaar ahaadaa.
+      const schoolCode = getSchoolCode();
+      const schoolName = getSchoolName();
+      if (!schoolCode) {
+        alert("Fadlan marka hore School Login samee ka hor inta aadan admin sameyn.");
+        setSaving(false);
+        return;
+      }
+
       const adminRef = doc(db, "admin", email.trim());
       const existing = await getDoc(adminRef);
       if (existing.exists()) {
@@ -107,6 +117,8 @@ export default function AddSubAdmin() {
         password: password.trim(),
         role: "subadmin",
         permissions,
+        schoolCode,
+        schoolName,
         createdAt: new Date(),
       });
 
@@ -181,7 +193,7 @@ export default function AddSubAdmin() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g. ahmed@risingstar.so"
+                  placeholder="e.g. ahmed@halbeeg.so"
                 />
               </Field>
 

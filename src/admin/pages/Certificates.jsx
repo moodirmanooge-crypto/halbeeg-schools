@@ -479,7 +479,7 @@ export default function Certificates() {
         // certificate's subjects table and "Result Average" line.
         topSubjects: subjectInfo.topSubjects,
         averageResult: subjectInfo.average,
-        schoolName: "Rising Star Primary & Secondary School",
+        schoolName: "HALBEEG SCHOOLS",
         createdAt: existingCertForStudent?.createdAt || serverTimestamp(),
         updatedAt: serverTimestamp(),
       };

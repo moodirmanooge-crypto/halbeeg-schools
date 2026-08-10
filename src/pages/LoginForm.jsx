@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firebase";
+import { fetchSchoolStatus } from "../utils/schoolGuard";
 
 export default function LoginForm({ role }) {
   const navigate = useNavigate();
@@ -150,12 +151,24 @@ export default function LoginForm({ role }) {
         ) {
           localStorage.setItem("superAdminAuth", JSON.stringify(loggedInUser));
           navigate("/super-admin/dashboard");
-        } else {
-          // Haddii uu yahay Admin-ka caadiga ah ee iskuulka
-          navigate("/admin/dashboard");
+          return;
         }
       }
 
+      // GATE-KA RUKUNKA: dhammaan doorarka aan ahayn super-admin — hubi
+      // in school-kooda uusan dhicin. Haddii uu dhacay, geey renewal-ka
+      // oo ha u ogolaan gelitaanka.
+      const gateCode =
+        loggedInUser?.schoolCode || loggedInUser?.schoolCode || "";
+      if (gateCode) {
+        const st = await fetchSchoolStatus(gateCode);
+        if (!st.active) {
+          navigate(`/renew/${gateCode}`);
+          return;
+        }
+      }
+
+      if (role === "Admin") navigate("/admin/dashboard");
       if (role === "Teacher") navigate("/teacher/dashboard");
       if (role === "Cashier") navigate("/cashier/dashboard");
       if (role === "Student") navigate("/student/dashboard");

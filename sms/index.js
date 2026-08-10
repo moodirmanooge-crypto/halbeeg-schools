@@ -76,7 +76,7 @@ async function sendOneSms(token, mobile, message, senderid) {
         refid: "0",
         mobile,
         message,
-        senderid: senderid || "RESING",
+        senderid: senderid || "HALBEEG",
         validity: 0,
       },
       {
@@ -176,7 +176,7 @@ exports.sendBulkSms = onRequest(
     cors: true,
   },
   async (req, res) => {
-    res.set("Access-Control-Allow-Origin", "https://resingstarschools.com");
+    res.set("Access-Control-Allow-Origin", "https://HALBEEGstarschools.com");
     res.set("Access-Control-Allow-Headers", "Content-Type");
     res.set("Access-Control-Allow-Methods", "POST, OPTIONS");
     if (req.method === "OPTIONS") {

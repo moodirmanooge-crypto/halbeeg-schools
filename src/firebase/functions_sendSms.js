@@ -1,6 +1,6 @@
 /**
  * =========================================================================
- *  RESING SCHOOL ERP — Bulk SMS Cloud Function (Hormuud SMS API)
+ *  HALBEEG SCHOOL ERP — Bulk SMS Cloud Function (Hormuud SMS API)
  * =========================================================================
  *
  *  WHY A CLOUD FUNCTION?
@@ -12,7 +12,7 @@
  *
  *  WHERE TO PUT THIS FILE
  *  If your project does not have Cloud Functions yet, run this ONCE from
- *  your project root (RESING_SCHOOL folder):
+ *  your project root (HALBEEG_SCHOOL folder):
  *
  *      npm install -g firebase-tools     (if not installed)
  *      firebase login
@@ -35,7 +35,7 @@
  *
  *      firebase functions:secrets:set HORMUUD_USERNAME
  *      firebase functions:secrets:set HORMUUD_PASSWORD
- *      firebase functions:secrets:set HORMUUD_SENDERID   (optional, e.g. "RESING")
+ *      firebase functions:secrets:set HORMUUD_SENDERID   (optional, e.g. "HALBEEG")
  *
  *  It will prompt you to type the value — paste your real Hormuud API
  *  username/password there (the same ones from https://business.hormuud.com/).
@@ -93,7 +93,7 @@ async function sendOneSms(token, mobile, message, senderid) {
         refid: "0",
         mobile,
         message,
-        senderid: senderid || "RESING",
+        senderid: senderid || "HALBEEG",
         validity: 0,
       },
       {

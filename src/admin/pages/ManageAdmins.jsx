@@ -8,10 +8,11 @@
 
 import { useEffect, useState } from "react";
 import { db } from "../../firebase/firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, query, where } from "firebase/firestore";
 import { Users, ShieldCheck, Pencil, Trash2, X, Save } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode } from "../../utils/schoolContext";
 
 // Kept in sync with admin/components/Sidebar.jsx `menus` array.
 const PERMISSION_OPTIONS = [
@@ -58,7 +59,17 @@ export default function ManageAdmins() {
   async function fetchAdmins() {
     try {
       setLoading(true);
-      const snap = await getDocs(collection(db, "admin"));
+      // Kaliya admin-yada school-kan (schoolCode). Admin walba wuxuu arkaa
+      // KALIYA admin-yada school-kiisa.
+      const schoolCode = getSchoolCode();
+      if (!schoolCode) {
+        setAdmins([]);
+        setLoading(false);
+        return;
+      }
+      const snap = await getDocs(
+        query(collection(db, "admin"), where("schoolCode", "==", schoolCode))
+      );
       setAdmins(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     } catch (err) {
       console.error(err);

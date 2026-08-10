@@ -5,7 +5,7 @@ import { IdCard, Printer, Search, Trash2, X } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
 
-const SCHOOL_NAME_EN = "RISING STAR PRIMARY & SECONDARY SCHOOL";
+const SCHOOL_NAME_EN = "HALBEEG SCHOOLS";
 const SCHOOL_NAME_AR = "مدرسة ريسن استار الأساسية والثانوية";
 
 const CLASS_ORDER = ["1", "2", "3", "4", "5", "6", "7", "8", "F1", "F2", "F3", "F4"];

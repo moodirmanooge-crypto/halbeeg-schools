@@ -185,7 +185,7 @@ export default function CertificateCard({ certificate, verifyUrl, elementId = "c
             />
             <CertLine
               label="Dhameystay/Dhameysatay Dugsiga Dhexe"
-              value={schoolName || "Rising Star Primary & Secondary School"}
+              value={schoolName || "HALBEEG SCHOOLS"}
             />
             <div style={{ display: "flex", gap: 12 }}>
               <div style={{ flex: 1 }}>
@@ -232,7 +232,7 @@ export default function CertificateCard({ certificate, verifyUrl, elementId = "c
             />
             <CertLine
               label="Completed primary school"
-              value={schoolName || "Rising Star Primary & Secondary School"}
+              value={schoolName || "HALBEEG SCHOOLS"}
             />
             <div style={{ display: "flex", gap: 12 }}>
               <div style={{ flex: 1 }}>

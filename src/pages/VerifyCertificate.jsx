@@ -75,7 +75,7 @@ export default function VerifyCertificate() {
     >
       <div style={{ textAlign: "center", marginBottom: 24 }}>
         <div style={{ fontSize: 20, fontWeight: 800, color: "#111827" }}>
-          Rising Star Primary & Secondary School
+          HALBEEG SCHOOLS
         </div>
         <div style={{ fontSize: 13.5, color: "#6B7280", marginTop: 2 }}>
           Certificate Verification
@@ -113,7 +113,7 @@ export default function VerifyCertificate() {
             bg="#DCFCE7"
             icon="✓"
             title="Certificate Verified"
-            message={`This is a genuine Class ${certificate.className || "8"} Leaving Certificate issued by Rising Star Primary & Secondary School.`}
+            message={`This is a genuine Class ${certificate.className || "8"} Leaving Certificate issued by HALBEEG SCHOOLS.`}
           />
           {/* Outer wrapper measures the available width; inner div is scaled
               down (not cropped) so the full 1000px-wide certificate always

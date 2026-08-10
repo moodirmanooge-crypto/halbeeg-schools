@@ -47,7 +47,7 @@ const MISSION_PILLARS = [
 ];
 
 const HISTORY_TIMELINE = [
-  { year: "2023", text: "Rising Star Primary & Secondary School was founded in Mogadishu with a mission to raise the next generation of leaders." },
+  { year: "2023", text: "HALBEEG SCHOOLS was founded in Mogadishu with a mission to raise the next generation of leaders." },
   { year: "2024", text: "Expanded classrooms and introduced a dedicated science and computer lab for hands-on learning." },
   { year: "2025", text: "Launched our digital school management system, connecting students, teachers, parents and staff." },
   { year: "2026", text: "Continuing to grow — new facilities, more teachers, and an even stronger academic program." },

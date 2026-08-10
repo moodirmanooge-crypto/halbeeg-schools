@@ -11,7 +11,7 @@ const SCHOOL = {
   nameArabic2: "الأساسية والثانوية",
   nameArabicCity: "مقديشـو-الصومال",
   location: "Mogadishu-Somalia",
-  website: "resingstarschools.com",
+  website: "HALBEEGstarschools.com",
   noticeOffice: "Main Office Wadajir District",
   noticeCity: "Mogadishu-Somalia",
   noticeEmail: "risingstar0261@gmail.com",
