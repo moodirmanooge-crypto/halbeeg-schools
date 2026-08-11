@@ -1,4 +1,3 @@
-//src/context/MessagesContext.jsx
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { db } from "../firebase/firebase";
 import {
@@ -8,6 +7,7 @@ import {
   onSnapshot,
   orderBy,
   doc,
+  getDoc,
   updateDoc,
 } from "firebase/firestore";
 
@@ -31,6 +31,22 @@ export function MessagesProvider({ children }) {
   const seenIds = useRef(new Set());
 
   const teacherId = localStorage.getItem("teacherId") || "";
+
+  // schoolCode-ka macallinka — fariimaha guud waxaa lagu shaandheeyaa si
+  // macallinku uu u arko KALIYA broadcast-yada school-kiisa.
+  const [schoolCode, setSchoolCode] = useState("");
+
+  useEffect(() => {
+    if (!teacherId) return;
+    (async () => {
+      try {
+        const tSnap = await getDoc(doc(db, "teachers", teacherId));
+        if (tSnap.exists()) setSchoolCode(tSnap.data().schoolCode || "");
+      } catch (e) {
+        console.log(e);
+      }
+    })();
+  }, [teacherId]);
 
   // ---- Codso idanka Notification API ----
   useEffect(() => {
@@ -95,13 +111,18 @@ export function MessagesProvider({ children }) {
     );
 
     const unsub = onSnapshot(qGroup, (snap) => {
-      const list = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+      const list = snap.docs
+        .map((d) => ({ id: d.id, ...d.data() }))
+        // Kaliya broadcast-yada school-kan (haddii schoolCode leeyahay).
+        // Fariimaha hore ee aan schoolCode lahayn sida caadiga ah u soco.
+        .filter((m) => !schoolCode || !m.schoolCode || m.schoolCode === schoolCode);
       setGroupMsgs(list);
 
       if (!isFirstLoadGroup.current) {
         snap.docChanges().forEach((change) => {
           if (change.type === "added") {
             const data = { id: change.doc.id, ...change.doc.data() };
+            if (data.schoolCode && schoolCode && data.schoolCode !== schoolCode) return;
             if (!seenIds.current.has(data.id)) {
               seenIds.current.add(data.id);
               fireBrowserNotification(data);
@@ -115,7 +136,8 @@ export function MessagesProvider({ children }) {
     });
 
     return () => unsub();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [schoolCode]);
 
   const allMessages = [...individualMsgs, ...groupMsgs].sort((a, b) => {
     const ta = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);

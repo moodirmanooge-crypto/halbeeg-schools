@@ -9,7 +9,6 @@ import {
   query,
   where,
   onSnapshot,
-  orderBy,
   doc,
   updateDoc,
 } from "firebase/firestore";
@@ -28,15 +27,17 @@ export default function NotificationBell() {
 
     const notifRef = collection(db, "notifications");
 
+    // MUHIIM: orderBy waa la saaray labada query si aan looga baahnayn
+    // "composite index" Firestore (where + orderBy). Kala-soobaynta taariikhda
+    // waxaa lagu sameeyaa merge() gudaha (client-side). Sidaas ALL iyo school
+    // gaar labaduba si hufan ayay u shaqeeyaan — mid uma baahdo index gaar ah.
     const qAll = query(
       notifRef,
-      where("targetSchoolCode", "==", "ALL"),
-      orderBy("createdAt", "desc")
+      where("targetSchoolCode", "==", "ALL")
     );
     const qMine = query(
       notifRef,
-      where("targetSchoolCode", "==", schoolCode),
-      orderBy("createdAt", "desc")
+      where("targetSchoolCode", "==", schoolCode)
     );
 
     let allDocs = [];
@@ -48,14 +49,22 @@ export default function NotificationBell() {
       setNotifications(combined);
     };
 
-    const unsubAll = onSnapshot(qAll, (snap) => {
-      allDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      merge();
-    });
-    const unsubMine = onSnapshot(qMine, (snap) => {
-      mineDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
-      merge();
-    });
+    const unsubAll = onSnapshot(
+      qAll,
+      (snap) => {
+        allDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        merge();
+      },
+      (err) => console.error("notifications ALL listener:", err)
+    );
+    const unsubMine = onSnapshot(
+      qMine,
+      (snap) => {
+        mineDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
+        merge();
+      },
+      (err) => console.error("notifications school listener:", err)
+    );
 
     return () => {
       unsubAll();
