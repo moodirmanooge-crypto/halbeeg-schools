@@ -3,7 +3,8 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../firebase/firebase";
-import { fetchSchoolStatus } from "../utils/schoolGuard";
+import { fetchSchoolByCode, isSchoolBlocked } from "../utils/subscription";
+import { setSchoolContext } from "../utils/schoolContext";
 
 export default function LoginForm({ role }) {
   const navigate = useNavigate();
@@ -158,14 +159,20 @@ export default function LoginForm({ role }) {
       // GATE-KA RUKUNKA: dhammaan doorarka aan ahayn super-admin — hubi
       // in school-kooda uusan dhicin. Haddii uu dhacay, geey renewal-ka
       // oo ha u ogolaan gelitaanka.
-      const gateCode =
-        loggedInUser?.schoolCode || loggedInUser?.schoolCode || "";
+      const gateCode = loggedInUser?.schoolCode || "";
       if (gateCode) {
-        const st = await fetchSchoolStatus(gateCode);
-        if (!st.active) {
-          navigate(`/renew/${gateCode}`);
+        const school = await fetchSchoolByCode(gateCode);
+        if (school && isSchoolBlocked(school)) {
+          localStorage.setItem("renewSchoolCode", gateCode);
+          navigate(`/renew?code=${gateCode}`);
           return;
         }
+        // Keydi school-ka hadda si dashboard-yadu xogtooda u soo bandhigaan.
+        setSchoolContext({
+          schoolCode: gateCode,
+          schoolName: school?.schoolName || school?.name || "",
+          schoolId: school?.id || "",
+        });
       }
 
       if (role === "Admin") navigate("/admin/dashboard");

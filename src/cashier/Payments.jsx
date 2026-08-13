@@ -516,6 +516,9 @@ const styles = {
     boxShadow: theme.shadow.card,
     border: `1px solid ${theme.colors.border}`,
     overflow: "auto",
+    // Scroll toosan (hoos) + jiifa (midig/bidix) marka miisku weyn yahay.
+    maxHeight: "70vh",
+    WebkitOverflowScrolling: "touch",
   },
   emptyState: {
     display: "flex",
@@ -534,6 +537,7 @@ const styles = {
   },
   table: {
     width: "100%",
+    minWidth: 1200,
     borderCollapse: "collapse",
     fontSize: 13.5,
   },

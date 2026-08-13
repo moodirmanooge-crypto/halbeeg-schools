@@ -488,12 +488,8 @@ export default function Dashboard() {
                   fontSize: 13.5,
                   cursor: "pointer",
                 }}
-              >
-                Send SMS
-                <Send size={15} />
-              </button>
-
-              <button
+         
+             
                 onClick={() => navigate("/admin/exam-cards")}
                 style={{
                   display: "inline-flex",

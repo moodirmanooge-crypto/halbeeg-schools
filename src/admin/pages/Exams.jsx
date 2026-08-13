@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode } from "../../utils/schoolContext";
 import {
   Download,
   ChevronRight,
@@ -57,10 +58,20 @@ export default function Exams() {
     try {
       setLoading(true);
 
+      // Kaliya xogta school-kan (schoolCode) — ma arag school kale.
+      const schoolCode = getSchoolCode();
+      if (!schoolCode) {
+        setStudents([]);
+        setExams([]);
+        setResults([]);
+        setLoading(false);
+        return;
+      }
+
       const [studentsSnap, examsSnap, resultsSnap] = await Promise.all([
-        getDocs(collection(db, "students")),
-        getDocs(collection(db, "exams")),
-        getDocs(collection(db, "results")),
+        getDocs(query(collection(db, "students"), where("schoolCode", "==", schoolCode))),
+        getDocs(query(collection(db, "exams"), where("schoolCode", "==", schoolCode))),
+        getDocs(query(collection(db, "results"), where("schoolCode", "==", schoolCode))),
       ]);
 
       setStudents(studentsSnap.docs.map((d) => ({ id: d.id, ...d.data() })));

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { db } from "../../firebase/firebase";
-import { collection, getDocs, doc, deleteDoc } from "firebase/firestore";
-import { IdCard, Printer, Search, Trash2, X } from "lucide-react";
+import { collection, getDocs, doc, getDoc, deleteDoc, query, where } from "firebase/firestore";
+import { IdCard, Printer, Search, Trash2, X, ChevronLeft, ChevronRight } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode } from "../../utils/schoolContext";
 
-const SCHOOL_NAME_EN = "HALBEEG SCHOOLS";
-const SCHOOL_NAME_AR = "مدرسة ريسن استار الأساسية والثانوية";
+const DEFAULT_SCHOOL_NAME_EN = "HALBEEG SCHOOLS";
 
 const CLASS_ORDER = ["1", "2", "3", "4", "5", "6", "7", "8", "F1", "F2", "F3", "F4"];
 function classRank(c) {
@@ -20,6 +20,9 @@ const EXAM_TYPES = [
   { key: "monthly2", label: "Monthly 2" },
   { key: "final", label: "Final" },
 ];
+
+// Tirada card-ka bog kasta lagu tuso.
+const CARDS_PER_PAGE = 4;
 
 function pad4(n) {
   return String(n).padStart(4, "0");
@@ -56,13 +59,57 @@ function ExamCardStyles() {
         cursor: pointer;
         box-shadow: 0 4px 10px rgba(0,0,0,0.35);
       }
+
+      /* ---- Print: dhammaan (dhamaan bogga hadda la arko) ----
+         Warqad kasta (A4) waxay qaadataa 4 card oo isugu jira grid 2x2 ah,
+         halkii ay ka noqon lahayd hal card warqad kasta. ---- */
       @media print {
+        @page { size: A4 portrait; margin: 10mm; }
         body * { visibility: hidden; }
         .ec-print-area, .ec-print-area * { visibility: visible; }
-        .ec-print-area { position: absolute; top: 0; left: 0; width: 100%; }
-        .ec-card { break-inside: avoid; page-break-inside: avoid; margin-bottom: 14px !important; box-shadow: none !important; }
+        .ec-print-area { position: absolute; top: 0; left: 0; width: 100%; margin: 0; padding: 0; }
+        .ec-print-area .ec-grid {
+          display: grid !important;
+          grid-template-columns: 1fr 1fr !important;
+          grid-template-rows: 1fr 1fr !important;
+          gap: 8mm !important;
+          width: 100%;
+          height: 277mm; /* A4 usable height (297mm - 2*10mm margin) */
+        }
+        .ec-print-area .ec-card-wrap {
+          break-inside: avoid;
+          page-break-inside: avoid;
+          height: 100%;
+          overflow: hidden;
+        }
+        .ec-print-area .ec-card {
+          height: 100%;
+          margin-bottom: 0 !important;
+          box-shadow: none !important;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+        }
+        /* haddii boggu ka badan yahay 4 card (4-per-page-ku waa isagu wuxuu
+           xaqiijiyaa 4 kaliya), ku qasab bog cusub inta xigta */
+        .ec-print-area .ec-grid:nth-of-type(n) { page-break-after: auto; }
         .ec-card-actions { display: none !important; }
       }
+
+      /* ---- Print: hal card oo kaliya (marka print-btn-ka card-ka la riixo) ----
+         data-print-only="true" waxaa lagu calaamadiyaa card-ka la doortay kaliya;
+         .ec-card-wrap kale ee bogga ku jira waa la qariyaa. */
+      body.ec-print-single .ec-layout * { visibility: hidden; }
+      body.ec-print-single [data-print-only="true"],
+      body.ec-print-single [data-print-only="true"] * { visibility: visible; }
+      body.ec-print-single [data-print-only="true"] {
+        position: absolute !important;
+        top: 0;
+        left: 0;
+        width: 100%;
+      }
+      body.ec-print-single .ec-card-actions { display: none !important; }
+
       @media (max-width: 900px) {
         .ec-page-pad { padding: 16px !important; }
         .ec-grid { grid-template-columns: 1fr; }
@@ -72,11 +119,22 @@ function ExamCardStyles() {
   );
 }
 
-function ExamCard({ card, onDelete }) {
+function ExamCard({ card, onDelete, onPrintOne, schoolName, schoolLogo, printOnlyId }) {
   const examLabel = EXAM_TYPES.find((t) => t.key === card.examType)?.label || "Final";
   return (
-    <div className="ec-card-wrap">
+    <div
+      className="ec-card-wrap"
+      data-print-only={printOnlyId ? String(printOnlyId === card.id) : undefined}
+    >
       <div className="ec-card-actions">
+        <button
+          className="ec-icon-btn"
+          onClick={() => onPrintOne(card)}
+          title="Daabac Card-kan Keliya"
+          style={{ background: "#6d5df0", color: "#fff" }}
+        >
+          <Printer size={14} />
+        </button>
         <button
           className="ec-icon-btn"
           onClick={() => onDelete(card)}
@@ -102,10 +160,16 @@ function ExamCard({ card, onDelete }) {
       >
         <div style={{ border: "2px solid #6b3f1d", borderRadius: 2, padding: "16px 20px" }}>
           <div style={{ textAlign: "center", marginBottom: 6 }}>
+            {schoolLogo ? (
+              <img
+                src={schoolLogo}
+                alt=""
+                style={{ width: 46, height: 46, objectFit: "contain", marginBottom: 4 }}
+              />
+            ) : null}
             <div style={{ fontWeight: 800, fontSize: 17, color: "#0f5132", letterSpacing: 0.3 }}>
-              {SCHOOL_NAME_EN}
+              {schoolName || DEFAULT_SCHOOL_NAME_EN}
             </div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#0f5132" }}>{SCHOOL_NAME_AR}</div>
           </div>
 
           <div
@@ -203,14 +267,23 @@ function ExamCard({ card, onDelete }) {
 export default function ExamCards() {
   const [loading, setLoading] = useState(true);
   const [cards, setCards] = useState([]);
+  // Magaca + logo-da school-ka hadda — laga akhriyo schools/{schoolCode}.
+  const [schoolInfo, setSchoolInfo] = useState({ name: "", logoUrl: "" });
   const [selectedClass, setSelectedClass] = useState(null);
   const [search, setSearch] = useState("");
   const [deleting, setDeleting] = useState(false);
   const [confirmTarget, setConfirmTarget] = useState(null); // { type: "one"|"all", card? }
+  // Bogga hadda la arko marka fasal la doorto (pagination — 4 card bog kasta).
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     load();
   }, []);
+
+  // Marka fasal cusub la doorto ama search-ka la beddelo, dib ugu celi bogga 1aad.
+  useEffect(() => {
+    setPage(1);
+  }, [selectedClass, search]);
 
   // ---- Kaliya soo aqri examCards collection-ka — waxaa ka buuxiya
   // Cashierka marka uu arday lacagta imtixaanka ka qaado (ExamPayments
@@ -219,7 +292,31 @@ export default function ExamCards() {
   async function load() {
     try {
       setLoading(true);
-      const snap = await getDocs(collection(db, "examCards"));
+      // Kaliya exam cards-ka school-kan (schoolCode) — ma arag school kale.
+      const schoolCode = getSchoolCode();
+      if (!schoolCode) {
+        setCards([]);
+        setLoading(false);
+        return;
+      }
+
+      // Soo akhri magaca + logo-da school-ka.
+      try {
+        const sSnap = await getDoc(doc(db, "schools", schoolCode));
+        if (sSnap.exists()) {
+          const sd = sSnap.data();
+          setSchoolInfo({
+            name: sd.schoolName || sd.name || "",
+            logoUrl: sd.logoUrl || "",
+          });
+        }
+      } catch (e) {
+        console.log(e);
+      }
+
+      const snap = await getDocs(
+        query(collection(db, "examCards"), where("schoolCode", "==", schoolCode))
+      );
       const data = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
       setCards(data);
     } catch (err) {
@@ -250,9 +347,49 @@ export default function ExamCards() {
       .sort((a, b) => (a.studentName || "").localeCompare(b.studentName || ""));
   }, [cards, selectedClass, search]);
 
+  // ---- Pagination: 4 card bog kasta ----
+  const totalPages = Math.max(1, Math.ceil(cardsForClass.length / CARDS_PER_PAGE));
+  const safePage = Math.min(page, totalPages);
+  const pagedCards = useMemo(() => {
+    const start = (safePage - 1) * CARDS_PER_PAGE;
+    return cardsForClass.slice(start, start + CARDS_PER_PAGE);
+  }, [cardsForClass, safePage]);
+
+  function goPrevPage() {
+    setPage((p) => Math.max(1, p - 1));
+  }
+  function goNextPage() {
+    setPage((p) => Math.min(totalPages, p + 1));
+  }
+
+  // Daabac dhammaan card-ka bogga hadda la arko (4-ka).
   function handlePrint() {
     window.print();
   }
+
+  // ID-ga card-ka la doortay in kaliya la daabaco (null = daabac dhammaan bogga).
+  const [printOnlyId, setPrintOnlyId] = useState(null);
+
+  // Daabac hal card oo kaliya — waxaan ku darnaa class gaar ah body-ga
+  // si print-ka uu u qariyo wax kasta oo kale, kadibna waan ka saarnaa.
+  function handlePrintOne(card) {
+    setPrintOnlyId(card.id);
+    document.body.classList.add("ec-print-single");
+    // waxaan sugaynaa hal render-cycle si data-print-only uu isugu dubarido
+    // kahor intaan window.print() la yeerin.
+    setTimeout(() => {
+      window.print();
+    }, 60);
+  }
+
+  useEffect(() => {
+    function afterPrint() {
+      document.body.classList.remove("ec-print-single");
+      setPrintOnlyId(null);
+    }
+    window.addEventListener("afterprint", afterPrint);
+    return () => window.removeEventListener("afterprint", afterPrint);
+  }, []);
 
   function askDeleteOne(card) {
     setConfirmTarget({ type: "one", card });
@@ -415,7 +552,8 @@ export default function ExamCards() {
 
                   <button
                     onClick={handlePrint}
-                    disabled={cardsForClass.length === 0}
+                    disabled={pagedCards.length === 0}
+                    title="Waxay daabici doontaa 4-da card ee bogga hadda la arko"
                     style={{
                       display: "flex",
                       alignItems: "center",
@@ -431,7 +569,7 @@ export default function ExamCards() {
                     }}
                   >
                     <Printer size={15} />
-                    Daabac Dhammaan
+                    Daabac Bogga
                   </button>
 
                   <button
@@ -457,9 +595,29 @@ export default function ExamCards() {
                 </div>
               </div>
 
-              <div style={{ color: "#c4b8f7", fontSize: 13, marginBottom: 16 }}>
-                Fasalka <strong style={{ color: "#fff" }}>{selectedClass}</strong> —{" "}
-                {cardsForClass.length} card
+              <div
+                style={{
+                  color: "#c4b8f7",
+                  fontSize: 13,
+                  marginBottom: 16,
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  flexWrap: "wrap",
+                  gap: 10,
+                }}
+              >
+                <span>
+                  Fasalka <strong style={{ color: "#fff" }}>{selectedClass}</strong> —{" "}
+                  {cardsForClass.length} card
+                </span>
+
+                {cardsForClass.length > 0 && (
+                  <span>
+                    Bogga <strong style={{ color: "#fff" }}>{safePage}</strong> /{" "}
+                    {totalPages}
+                  </span>
+                )}
               </div>
 
               {cardsForClass.length === 0 ? (
@@ -467,13 +625,82 @@ export default function ExamCards() {
                   Cardad lama helin fasalkan/raadintan.
                 </div>
               ) : (
-                <div className="ec-print-area">
-                  <div className="ec-grid">
-                    {cardsForClass.map((c) => (
-                      <ExamCard key={c.id} card={c} onDelete={askDeleteOne} />
-                    ))}
+                <>
+                  <div className="ec-print-area">
+                    <div className="ec-grid">
+                      {pagedCards.map((c) => (
+                        <ExamCard
+                          key={c.id}
+                          card={c}
+                          onDelete={askDeleteOne}
+                          onPrintOne={handlePrintOne}
+                          schoolName={schoolInfo.name}
+                          schoolLogo={schoolInfo.logoUrl}
+                          printOnlyId={printOnlyId}
+                        />
+                      ))}
+                    </div>
                   </div>
-                </div>
+
+                  {totalPages > 1 && (
+                    <div
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        gap: 14,
+                        marginTop: 26,
+                      }}
+                    >
+                      <button
+                        onClick={goPrevPage}
+                        disabled={safePage === 1}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "9px 16px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(139,108,245,0.3)",
+                          background: safePage === 1 ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
+                          color: safePage === 1 ? "#5c5878" : "#e5e3f7",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: safePage === 1 ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        <ChevronLeft size={15} />
+                        Hore
+                      </button>
+
+                      <span style={{ color: "#c4b8f7", fontSize: 13 }}>
+                        {safePage} / {totalPages}
+                      </span>
+
+                      <button
+                        onClick={goNextPage}
+                        disabled={safePage === totalPages}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          gap: 6,
+                          padding: "9px 16px",
+                          borderRadius: 10,
+                          border: "1px solid rgba(139,108,245,0.3)",
+                          background:
+                            safePage === totalPages ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.05)",
+                          color: safePage === totalPages ? "#5c5878" : "#e5e3f7",
+                          fontWeight: 700,
+                          fontSize: 13,
+                          cursor: safePage === totalPages ? "not-allowed" : "pointer",
+                        }}
+                      >
+                        Xiga
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+                  )}
+                </>
               )}
             </div>
           )}

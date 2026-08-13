@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase/firebase";
 import { Search, Users, User } from "lucide-react";
+import { getSchoolCode } from "../../utils/schoolContext";
 
 export default function Parents() {
   const [parents, setParents] = useState([]);
@@ -17,7 +18,16 @@ export default function Parents() {
   async function loadParents() {
     try {
       setLoading(true);
-      const snap = await getDocs(collection(db, "students"));
+      // Kaliya ardayda school-kan (schoolCode) — ma arag school kale.
+      const schoolCode = getSchoolCode();
+      if (!schoolCode) {
+        setParents([]);
+        setLoading(false);
+        return;
+      }
+      const snap = await getDocs(
+        query(collection(db, "students"), where("schoolCode", "==", schoolCode))
+      );
       const data = snap.docs
         .map((doc) => ({
           id: doc.id,
@@ -37,10 +47,26 @@ export default function Parents() {
 
   async function loadPayments() {
     try {
-      const snap = await getDocs(collection(db, "payments"));
+      const schoolCode = getSchoolCode();
+      if (!schoolCode) {
+        setPayments({});
+        return;
+      }
+      const snap = await getDocs(
+        query(collection(db, "payments"), where("schoolCode", "==", schoolCode))
+      );
+      // Cashier-ku wuxuu ku keydiyaa payments/{studentId}_{monthKey}. Halkan
+      // waxaan ka dhignaa map studentId-based ah oo haya payment-ka UGU DAMBEEYA
+      // (monthKey ugu weyn) arday walba — si Parents-ku u tuso status-ka cusub.
       const map = {};
-      snap.docs.forEach((doc) => {
-        map[doc.id] = doc.data();
+      snap.docs.forEach((docSnap) => {
+        const d = docSnap.data();
+        const sid = d.studentId;
+        if (!sid) return;
+        const prev = map[sid];
+        if (!prev || String(d.monthKey || "") > String(prev.monthKey || "")) {
+          map[sid] = d;
+        }
       });
       setPayments(map);
     } catch (err) {
@@ -67,7 +93,10 @@ export default function Parents() {
     let paidTotal = 0;
 
     if (record) {
-      if (Array.isArray(record.entries)) {
+      if (record.paidAmount !== undefined) {
+        // Field-ka cashier-ku keydiyo waa 'paidAmount'.
+        paidTotal = Number(record.paidAmount) || 0;
+      } else if (Array.isArray(record.entries)) {
         paidTotal = record.entries.reduce(
           (sum, e) => sum + (Number(e.amount) || 0),
           0

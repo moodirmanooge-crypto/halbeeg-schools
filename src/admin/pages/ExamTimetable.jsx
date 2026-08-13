@@ -24,6 +24,7 @@ import {
 } from "lucide-react";
 import Sidebar from "../components/Sidebar";
 import Topbar from "../components/Topbar";
+import { getSchoolCode } from "../../utils/schoolContext";
 
 // Fixed class order: 1 -> 8 (primary), then F1 -> F4 (secondary/form)
 const CLASS_ORDER = ["1", "2", "3", "4", "5", "6", "7", "8", "F1", "F2", "F3", "F4"];
@@ -204,6 +205,10 @@ function TeacherSelect({ value, options, onChange }) {
 }
 
 export default function ExamTimetable() {
+  // schoolCode-ka school-ka admin-ka — dhammaan exam timetable doc-yada
+  // hordhac loogu darayaa si laba school oo isku fasal magac leh aysan
+  // isugu qaldamin, oo mid walbana kaliya kiisa la muujiyo.
+  const schoolCode = getSchoolCode();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [teachers, setTeachers] = useState({}); // id -> { fullName, subject, classes }
@@ -225,10 +230,16 @@ export default function ExamTimetable() {
   async function load() {
     try {
       setLoading(true);
+      if (!schoolCode) {
+        setTeachers({});
+        setExamDocs({});
+        setLoading(false);
+        return;
+      }
       const [teachersSnap, examSnap, examWeekSnap] = await Promise.all([
-        getDocs(collection(db, "teachers")),
-        getDocs(collection(db, "examTimetable")),
-        getDocs(collection(db, "examWeek")),
+        getDocs(query(collection(db, "teachers"), where("schoolCode", "==", schoolCode))),
+        getDocs(query(collection(db, "examTimetable"), where("schoolCode", "==", schoolCode))),
+        getDocs(query(collection(db, "examWeek"), where("schoolCode", "==", schoolCode))),
       ]);
 
       const teacherMap = {};
@@ -281,7 +292,7 @@ export default function ExamTimetable() {
 
   useEffect(() => {
     if (!selectedClass) return;
-    const key = `${selectedClass}__${activeDay}`;
+    const key = `${schoolCode}__${selectedClass}__${activeDay}`;
     const existing = examDocs[key];
     setDraftSlots(
       existing?.slots?.length
@@ -321,7 +332,7 @@ export default function ExamTimetable() {
     );
     if (!confirmed) return;
 
-    const key = `${selectedClass}__${dayKey}`;
+    const key = `${schoolCode}__${selectedClass}__${dayKey}`;
     setDeletingDay(dayKey);
     try {
       await deleteDoc(doc(db, "examTimetable", key));
@@ -360,16 +371,17 @@ export default function ExamTimetable() {
     setSavingDates(true);
     try {
       const payload = {
+        schoolCode,
         className: selectedClass,
         startDate: draftStartDate,
         endDate: draftEndDate,
         updatedAt: new Date(),
       };
-      await setDoc(doc(db, "examWeek", selectedClass), payload);
+      await setDoc(doc(db, "examWeek", `${schoolCode}__${selectedClass}`), payload);
       setExamWeekDates((prev) => ({ ...prev, [selectedClass]: payload }));
 
       const studentsSnap = await getDocs(
-        query(collection(db, "students"), where("className", "==", selectedClass))
+        query(collection(db, "students"), where("schoolCode", "==", schoolCode), where("className", "==", selectedClass))
       );
       if (!studentsSnap.empty) {
         const batch = writeBatch(db);
@@ -416,12 +428,12 @@ export default function ExamTimetable() {
   async function syncStudentsExamTimetable(className, updatedExamDocs) {
     try {
       const studentsSnap = await getDocs(
-        query(collection(db, "students"), where("className", "==", className))
+        query(collection(db, "students"), where("schoolCode", "==", schoolCode), where("className", "==", className))
       );
       if (studentsSnap.empty) return;
 
       const weekSchedule = DAYS.map((d) => {
-        const key = `${className}__${d.key}`;
+        const key = `${schoolCode}__${className}__${d.key}`;
         const slots = (updatedExamDocs[key]?.slots || [])
           .slice()
           .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""))
@@ -452,7 +464,7 @@ export default function ExamTimetable() {
   async function saveDay() {
     if (!selectedClass) return;
     setSaving(true);
-    const key = `${selectedClass}__${activeDay}`;
+    const key = `${schoolCode}__${selectedClass}__${activeDay}`;
 
     // Skip rows with no subject entered to avoid saving blank slots.
     const cleanSlots = withExamNumbers(
@@ -467,6 +479,7 @@ export default function ExamTimetable() {
         delete updatedDocs[key];
       } else {
         const payload = {
+          schoolCode,
           className: selectedClass,
           day: activeDay,
           slots: cleanSlots,
@@ -824,7 +837,7 @@ export default function ExamTimetable() {
                 {DAYS.map((d) => {
                   const isActive = d.key === activeDay;
                   const hasSlots =
-                    (examDocs[`${selectedClass}__${d.key}`]?.slots || []).length > 0;
+                    (examDocs[`${schoolCode}__${selectedClass}__${d.key}`]?.slots || []).length > 0;
                   return (
                     <button
                       key={d.key}
@@ -1043,6 +1056,7 @@ export default function ExamTimetable() {
 
               {/* Read-only summary of the saved exam week for this class */}
               <ExamWeekSummary
+                schoolCode={schoolCode}
                 selectedClass={selectedClass}
                 examDocs={examDocs}
                 teachers={teachers}
@@ -1058,9 +1072,9 @@ export default function ExamTimetable() {
   );
 }
 
-function ExamWeekSummary({ selectedClass, examDocs, teachers, onEditDay, onDeleteDay, deletingDay }) {
+function ExamWeekSummary({ schoolCode, selectedClass, examDocs, teachers, onEditDay, onDeleteDay, deletingDay }) {
   const rows = DAYS.map((d) => {
-    const key = `${selectedClass}__${d.key}`;
+    const key = `${schoolCode}__${selectedClass}__${d.key}`;
     const slots = withExamNumbers(examDocs[key]?.slots || []);
     return { day: d, slots };
   });

@@ -70,17 +70,24 @@ export default function ExamPayments() {
       setSchoolCode(code);
       setSchoolName(name);
 
-      const examWeekSnap = await getDocs(collection(db, "examWeek"));
+      // Kaliya examWeek-yada school-kan (schoolCode).
+      const examWeekSnap = await getDocs(
+        query(collection(db, "examWeek"), where("schoolCode", "==", code))
+      );
       const weekMap = {};
       examWeekSnap.docs.forEach((d) => {
-        weekMap[d.id] = d.data();
+        const data = d.data();
+        // Fasalka dhabta ah waa field-ka className (tusaale "F4"), MA aha
+        // doc ID-ga oo hordhac schoolCode leh (tusaale "7890__F4").
+        const cls = data.className || d.id;
+        weekMap[cls] = data;
       });
       setExamWeeks(weekMap);
 
       const activeClasses = new Set(
         Object.entries(weekMap)
           .filter(([, wk]) => isExamWeekActive(wk))
-          .map(([cls]) => cls.toUpperCase())
+          .map(([cls]) => String(cls).toUpperCase())
       );
 
       const studentsSnap = await getDocs(
@@ -100,7 +107,9 @@ export default function ExamPayments() {
 
       // Xagee la joogaa — arday kastoo horey loo sameeyay Exam Card
       // xilligan (si aan loo soo bandhigin sidii mid aan la bixin).
-      const cardsSnap = await getDocs(collection(db, "examCards"));
+      const cardsSnap = await getDocs(
+        query(collection(db, "examCards"), where("schoolCode", "==", code))
+      );
       const statusMap = {};
       cardsSnap.docs.forEach((d) => {
         const data = d.data();
